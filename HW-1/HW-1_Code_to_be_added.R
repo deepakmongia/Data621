@@ -61,13 +61,19 @@ moneyball_df_model_imputed <- mice(data = moneyball_df_model, m = 1,
 
 moneyball_df_model_imputed_df1 <- mice::complete(moneyball_df_model_imputed, 1)
 
+#### Test train approach
+set.seed(123)
+split <- sample.split(moneyball_df_model_imputed_df1$TARGET_WINS, SplitRatio = 0.8)
+training_set <- subset(moneyball_df_model_imputed_df1, split == TRUE)
+test_set <- subset(moneyball_df_model_imputed_df1, split == FALSE)
+
 
 #### Start preparing models
 g1 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B +
            TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
            TEAM_BASERUN_SB + TEAM_BASERUN_CS + TEAM_PITCHING_H +
            TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO +
-           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = moneyball_df_model_imputed_df1)
+           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = training_set)
 
 vif(g1)
 
@@ -78,7 +84,7 @@ summary(g1)
 g2 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B +
            TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
            TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_BB + TEAM_PITCHING_SO +
-           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = moneyball_df_model_imputed_df1)
+           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = training_set)
 
 
 summary(g2)
@@ -87,7 +93,7 @@ summary(g2)
 g3 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B +
            TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
            TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_SO +
-           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = moneyball_df_model_imputed_df1)
+           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = training_set)
 
 
 summary(g3)
