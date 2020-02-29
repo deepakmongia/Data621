@@ -79,6 +79,16 @@ vif(g1)
 
 summary(g1)
 
+rmse_calc <- function(actual, predicted) {
+  rmse_val <- sqrt(sum((actual - predicted)^2) / length(actual))
+  return(rmse_val)
+}
+
+### RMSE of first model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(g1, newdata = training_set))
+### RMSE of first model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(g1, newdata = test_set))
+
 # Removing : TEAM_BATTING_3B, TEAM_BASERUN_CS, TEAM_PITCHING_HR - based on p-values
 
 g2 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B +
@@ -89,6 +99,12 @@ g2 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B +
 
 summary(g2)
 
+### RMSE of first model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(g2, newdata = training_set))
+### RMSE of first model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(g2, newdata = test_set))
+
+
 # Removing : TEAM_PITCHING_BB - based on p-value
 g3 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B +
            TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
@@ -97,3 +113,8 @@ g3 <- lm(TARGET_WINS ~TEAM_BATTING_H + TEAM_BATTING_2B +
 
 
 summary(g3)
+
+### RMSE of first model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(g3, newdata = training_set))
+### RMSE of first model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(g3, newdata = test_set))
