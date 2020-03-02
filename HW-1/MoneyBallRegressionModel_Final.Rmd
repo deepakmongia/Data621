@@ -1,0 +1,552 @@
+---
+title: "DATA 621 - Homework 1"
+author: "Deepak Mongia & Soumya Ghosh"
+date: "February 25, 2020"
+always_allow_html: yes
+output:
+  pdf_document: default
+  html_document:
+    df_print: kable
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float:
+      collapsed: true
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r warning=FALSE, message=FALSE}
+library(kableExtra)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(MASS)
+library(corrplot)
+library(RColorBrewer)
+library(GGally)
+library(ggResidpanel)
+library(psych)
+library(mice)
+library(reshape2)
+library(cowplot)
+library(car)
+library(caTools)
+library(VIM)
+library(broom)
+```
+
+## Introduction
+
+The dataset that we have been given for this assignment is a collection of historical baseball team performances. Each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record has the performance of the team for the given year, with all of the statistics adjusted to match the performance of a 162 game season.
+
+The original Training data set is comprised of 17 elements and 2276 total observations. Out of those 17 elements, INDEX is simply an index value used for sorting while TARGET_WINS represents the response variable we are to use within our regression models. The remaining 15 elements are all potential predictor variables for our linear models. A summary table for the data set is provided below.
+
+![](https://github.com/soumya2g/CUNYDataMiningHomeWork/blob/master/HomeWork_1/Images/DataTable.png?raw=true)
+
+## Objective
+
+Our objective is to build a multiple linear regression model on the training data to predict the number of wins for the team. We can only use the variables listed above (or variables that can be derived from the variables provided).
+
+## Data Load
+
+Loaded Training and Evalutaion data sets into respective data frames.
+
+```{r}
+train_df <- read.csv("https://raw.githubusercontent.com/soumya2g/CUNYDataMiningHomeWork/master/HomeWork_1/DataFiles/moneyball-training-data.csv")
+
+eval_df <- read.csv("https://raw.githubusercontent.com/soumya2g/CUNYDataMiningHomeWork/master/HomeWork_1/DataFiles/moneyball-evaluation-data.csv")
+
+```
+## Training Data
+
+Excluded the 'INDEX' attribute from training and evaluation(test) data frames.
+
+```{r}
+train_df <- train_df[-c(1)]
+```
+
+Sample snapshot of training data frame -
+
+```{r}
+
+head(train_df, 20) %>% kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% scroll_box(width="100%",height="300px")
+
+str(train_df)
+
+```
+
+## PART I: Data Exploration
+
+We wanted to start off data exploration process with high level descriptive statistical summary and missing/exception value analysis. 
+
+### Descriptive Statistical Summary
+
+Basic statistical summary of all features and dependant variable (TARGET_WINS).
+
+```{r}
+
+stat_summary <- function(df){
+  df %>%
+    summary() %>%
+    kable() %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%  scroll_box(width="100%",height="300px")
+}
+stat_summary(train_df)
+
+```
+We also used describe() function of 'psych' package to summarize additional statistical measurements like Standard Deviation, Skewness, Kurtois, Standard Error etc.
+
+
+```{r}
+stat_desc <- function(df){
+df %>% 
+    describe() %>%
+    kable() %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%  scroll_box(width="100%",height="300px")
+}
+
+stat_desc(train_df)
+
+```
+### Missing Value Analysis
+
+Below are the features that has NA values. It is clear from the table below, TEAM_BATTING_HBP(>90%) and TEAM_BASERUN_CS (>33%) have significant NA Values -
+
+```{r}
+## Counts of missing data per feature
+train_na_df <- data.frame(apply(train_df, 2, function(x) length(which(is.na(x)))))
+train_na_df1 <- data.frame(apply(train_df, 2,function(x) {sum(is.na(x)) / length(x) * 100}))
+
+train_na_df <- cbind(Feature = rownames(train_na_df), train_na_df, train_na_df1)
+colnames(train_na_df) <- c('Feature Name','No. of NA Recocrds','Percentage of NA Records')
+rownames(train_na_df) <- NULL
+
+
+train_na_df%>% filter(`No. of NA Recocrds` != 0) %>% arrange(desc(`No. of NA Recocrds`)) %>% kable() %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% scroll_box(width="100%",height="300px")
+
+
+
+```
+
+### Descriptive Statistical Plots
+
+#### Box Plots
+
+```{r fig.height=10, fig.width=10, warning=FALSE, message=FALSE}
+
+## Box plots:
+gb1 <- ggplot(data = train_df, aes(y = TARGET_WINS)) + geom_boxplot()
+gb2 <- ggplot(data = train_df, aes(y = TEAM_BATTING_H)) + geom_boxplot()
+gb3 <- ggplot(data = train_df, aes(y = TEAM_BATTING_2B)) + geom_boxplot()
+gb4 <- ggplot(data = train_df, aes(y = TEAM_BATTING_3B)) + geom_boxplot()
+gb5 <- ggplot(data = train_df, aes(y = TEAM_BATTING_HR)) + geom_boxplot()
+gb6 <- ggplot(data = train_df, aes(y = TEAM_BATTING_BB)) + geom_boxplot()
+gb7 <- ggplot(data = train_df, aes(y = TEAM_BATTING_HBP)) + geom_boxplot()
+gb8 <- ggplot(data = train_df, aes(y = TEAM_BATTING_SO)) + geom_boxplot()
+gb9 <- ggplot(data = train_df, aes(y = TEAM_BASERUN_SB)) + geom_boxplot()
+gb10 <- ggplot(data = train_df, aes(y = TEAM_BASERUN_CS)) + geom_boxplot()
+gb11 <- ggplot(data = train_df, aes(y = TEAM_FIELDING_E)) + geom_boxplot()
+gb12 <- ggplot(data = train_df, aes(y = TEAM_FIELDING_DP)) + geom_boxplot()
+gb13 <- ggplot(data = train_df, aes(y = TEAM_PITCHING_BB)) + geom_boxplot()
+gb14 <- ggplot(data = train_df, aes(y = TEAM_PITCHING_H)) + geom_boxplot()
+gb15 <- ggplot(data = train_df, aes(y = TEAM_PITCHING_HR)) + geom_boxplot()
+gb16 <- ggplot(data = train_df, aes(y = TEAM_PITCHING_SO)) + geom_boxplot()
+
+plot_grid(gb1, gb2, gb3, gb4, gb5, gb6, gb7, gb8, gb9, gb10,
+          gb11, gb12, gb13, gb14, gb15, gb16, labels = "AUTO, scale = 10")
+
+```
+
+
+#### Density Plots
+
+```{r fig.height=8, fig.width=10}
+train_df %>%
+  gather(variable, value, TARGET_WINS:TEAM_FIELDING_DP) %>%
+  ggplot(., aes(value)) + 
+  geom_density(fill = "dodgerblue4", color="dodgerblue4") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = element_blank())
+
+```
+
+### Observations Summary 
+
+- The dataset has many outliers with some observations that are more extreme than the 1.5 * IQR of the box plot whiskers. We also see that the variance of some of the explanatory variables greatly exceeds the variance of the response "win" variable. 
+- Dependant variable **TARGET_WINS** is normally distributed which indicates that data set includes a balanced amount of good, bad and average team performances
+- **TEAM_BATTING_HR,TEAM_BATTING_SO** and **TEAM_PITCHING_HR** features are showing bi-modal distribution
+- Some of the features like **TEAM_BASERUN_CS, TEAM_BASERUN_SB and TEAM_FIELDING_E** are right skewed
+- Observing the results of missing value analysis, we need to remove **TEAM_BATTING_HBP** due to large amount of missing values. We will need to come up with an imputation mechanism for the other features with missing values.
+
+
+## PART II: Data Preparation
+
+### Remove the feature: TEAM_BATTING_HBP
+
+The TEAM_BATTING_HBP variable contains 2085 missing values out of a total of 2277. Since it would be very difficult to accurately impute such a large proportion of any variable's missing values, so we choose to exclude the variable from our further analysis.
+
+```{r}
+train_df <- train_df %>% dplyr::select(-c(TEAM_BATTING_HBP))
+eval_df <-  eval_df %>% dplyr::select(-c(TEAM_BATTING_HBP))
+
+```
+Plotting the missing data pattern after removing the max. missing feature -
+
+```{r fig.height=8, fig.width=10}
+aggr_plot <- aggr(train_df, col=c('dodgerblue4','red'),
+                 numbers=TRUE, sortVars=TRUE,oma = c(10,5,5,3),
+                 labels=names(train_df), cex.axis=.8, gap=3, axes = TRUE, Prop = TRUE,
+                 ylab=c("Histogram of missing data","Pattern"))
+
+
+```
+
+### Imputation
+
+Imputing the missing data for the other 4 features, which we are keeping for our analysis. We have used the 'Predictive Mean Matching'(pmm) method included in MICE package for imputation purposes.
+
+```{r warning=FALSE, message=FALSE}
+
+impute_data <- function(df){
+  
+  df <- mice(data = df, m = 1, method = "pmm", maxit = 5, seed = 500)
+  df <- mice::complete(df, 1)
+}
+
+train_df <- impute_data(train_df)
+eval_df <- impute_data(eval_df)
+
+```
+### Feature Engineering
+
+We created a new variable called TEAM_BATTING_1B which represents offensive single base hits. (created by subtracting out the TEAM_BATTING doubles, triples and home runs from the TEAM_BATTING_H variable). We believe that separating out singles from the other unique hit values will minimize collinearity. The TEAM_BATTING_H variable is then removed from the data set since it is simply a linear combination of its component variables.
+
+```{r}
+add_batting1b_feature <- function(df){
+  df <-df %>%
+    mutate(TEAM_BATTING_1B = TEAM_BATTING_H - TEAM_BATTING_2B - TEAM_BATTING_3B - TEAM_BATTING_HR)
+}
+
+train_df <- add_batting1b_feature(train_df)
+eval_df <- add_batting1b_feature(eval_df)
+
+train_df <- train_df %>% dplyr::select(-c(TEAM_BATTING_H))
+eval_df <-  eval_df %>% dplyr::select(-c(TEAM_BATTING_H))
+```
+
+### Correlation Plot
+
+```{r fig.height=10, fig.width=10}
+
+corrMatrix <- round(cor(train_df),4)
+
+corrMatrix %>% corrplot(., method = "color", outline = T, addgrid.col = "darkgray", order="hclust", addrect = 4, rect.col = "black", rect.lwd = 5,cl.pos = "b", tl.col = "indianred4", tl.cex = 1.0, cl.cex = 1.0, addCoef.col = "white", number.digits = 2, number.cex = 0.8, col = colorRampPalette(c("darkred","white","dodgerblue4"))(100))
+
+```
+Based on the Correlation plot above, there is a high degree of collinearity amogst independent variables like **TEAM_BATTING_HR, TEAM_PITCHING_HR,TEAM_BASERUN_SB, TEAM_BASERUN_CS** etc.
+
+### Handling multicollinearity
+
+**TEAM_BASERUN_CS:** This variable is strongly correlated (82%) with the TEAM_BASERUN_SB variable and is the 2nd largest source of NA's in our data set. Hence we decided to exclude the variable from our analysis.
+
+**TEAM_PITCHING_HR:** This variable is highly (97%) correlated with TEAM_BATTING_HR. The fact that these two variables are nearly perfectly correlated indicates that one of them can legitimately be removed from the data set, and we chose TEAM_PITCHING_HR to be removed from our model for further analysis.
+
+```{r}
+train_df <- train_df %>% dplyr::select(-c(TEAM_BASERUN_CS,TEAM_PITCHING_HR))
+eval_df <- eval_df %>% dplyr::select(-c(TEAM_BASERUN_CS,TEAM_PITCHING_HR))
+
+```
+
+### Data Preparation Results
+
+After making feature removal and imputation we computed the statistical summary of the resultant training data and created feature density plots.
+
+```{r fig.height=8, fig.width=10}
+stat_desc(train_df)
+
+train_df %>%
+  gather(variable, value, TARGET_WINS:TEAM_BATTING_1B) %>%
+  ggplot(., aes(value)) + 
+  geom_density(fill = "dodgerblue4", color="dodgerblue4") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = element_blank())
+```
+
+## PART III: Building Models
+
+### Test train approach
+
+We have divided the traning dataset into training and test sets using a 80/20 split. We will build our models on the training set and evaluate it on the test set.
+
+```{r}
+set.seed(123)
+split <- sample.split(train_df$TARGET_WINS, SplitRatio = 0.8)
+training_set <- subset(train_df, split == TRUE)
+test_set <- subset(train_df, split == FALSE)
+
+```
+
+We will build four different models to see which one yields the best performance. 
+
+
+### Model 1:
+
+```{r}
+g1 <- lm(TARGET_WINS ~ TEAM_BATTING_1B + TEAM_BATTING_2B + TEAM_BATTING_3B +
+           TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
+           TEAM_BASERUN_SB +  TEAM_PITCHING_H +
+            TEAM_PITCHING_BB + TEAM_PITCHING_SO +
+           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = training_set)
+
+summary(g1) 
+
+```
+
+#### VIF Results
+
+Multicollinearity can assessed by computing a score called the Variance Inflation Factor (or VIF), which measures how much the variance of a regression coefficient is inflated due to multicollinearity in the model. Features with VIF scores higher than 5 or 10 are still showing relatively higher degree of Collinearity. But we decided against removing any more features at this point.
+
+```{r}
+vif(g1)
+```
+
+#### Model Diagnostic Plots
+
+```{r fig.height=12, fig.width=12}
+
+resid_panel(g1, plots='default', smoother = TRUE)
+
+```
+
+#### RMSE Calculation
+
+```{r}
+rmse_calc <- function(actual, predicted) {
+  rmse_val <- sqrt(sum((actual - predicted)^2) / length(actual))
+  
+  return(rmse_val)
+}
+
+### RMSE of first model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(g1, newdata = training_set))
+### RMSE of first model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(g1, newdata = test_set))
+```
+
+#### Model Summary
+
+We have used the glance() methid from broom package to gather the model summary statistics in one data frame and appended our RMSE calculations so that we can compare these statistics in the model selection section.
+
+
+```{r}
+model_1 <- as.data.frame(glance(g1))
+model_1$Train_RMSE <- rmse_calc(training_set$TARGET_WINS, predict(g1, newdata = training_set))
+model_1$Test_RMSE <- rmse_calc(test_set$TARGET_WINS, predict(g1, newdata = test_set))
+
+```
+
+### Model 2:
+
+```{r}
+# Removing : TEAM_PITCHING_SO - based on p-values
+
+g2 <- lm(TARGET_WINS ~TEAM_BATTING_1B + TEAM_BATTING_2B + TEAM_BATTING_3B + 
+           TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
+           TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_BB + 
+           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = training_set)
+
+
+summary(g2)
+```
+
+#### Model Diagnostic Plots
+
+```{r fig.height=8, fig.width=8}
+
+resid_panel(g2, plots='default', smoother = TRUE)
+```
+#### RMSE Calculation
+
+```{r}
+### RMSE of second model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(g2, newdata = training_set))
+### RMSE of second model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(g2, newdata = test_set))
+```
+
+#### Model Summary
+
+```{r}
+
+model_2 <- as.data.frame(glance(g2))
+model_2$Train_RMSE <- rmse_calc(training_set$TARGET_WINS, predict(g2, newdata = training_set))
+model_2$Test_RMSE <- rmse_calc(test_set$TARGET_WINS, predict(g2, newdata = test_set))
+
+
+```
+
+### Model 3:
+
+```{r}
+# Removing : TEAM_PITCHING_BB - based on p-value
+g3 <- lm(TARGET_WINS ~TEAM_BATTING_1B + TEAM_BATTING_2B +
+           TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
+           TEAM_BASERUN_SB + TEAM_PITCHING_H + 
+           TEAM_FIELDING_E + TEAM_FIELDING_DP, data = training_set)
+
+
+summary(g3)
+```
+#### Model Diagnostic Plots
+
+```{r fig.height=8, fig.width=8}
+
+resid_panel(g1, plots='default', smoother = TRUE)
+```
+#### RMSE Calculation
+
+```{r}
+### RMSE of third model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(g3, newdata = training_set))
+### RMSE of third model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(g3, newdata = test_set))
+```
+
+#### Model Summary
+
+```{r}
+model_3 <- as.data.frame(glance(g3))
+model_3$Train_RMSE <- rmse_calc(training_set$TARGET_WINS, predict(g3, newdata = training_set))
+model_3$Test_RMSE <- rmse_calc(test_set$TARGET_WINS, predict(g3, newdata = test_set))
+```
+
+### Model 4: Stepwise Regression Model
+
+For the fourth model, we have used backward elimination process with all variables plus higher order polynomials for the features. We have used the stepAIC() function from MASS package, which choose the best model by AIC. 
+
+```{r}
+
+full_formula <- "TARGET_WINS ~ TEAM_BATTING_1B + TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E + TEAM_FIELDING_DP + I(TEAM_BATTING_1B^2) + I(TEAM_BATTING_2B^2) + I(TEAM_BATTING_3B^2) + I(TEAM_BATTING_HR^2) + I(TEAM_BATTING_BB^2) + I(TEAM_BATTING_SO^2) + I(TEAM_BASERUN_SB^2) + I(TEAM_PITCHING_H^2) +  I(TEAM_PITCHING_BB^2) + I(TEAM_PITCHING_SO^2) + I(TEAM_FIELDING_E^2) + I(TEAM_FIELDING_DP^2)"
+
+full_model <- lm(full_formula, training_set)
+
+step_model <- stepAIC(full_model, direction = "backward", 
+                      trace = FALSE)
+
+summary(step_model)
+```
+
+#### Model Diagnostic Plots
+
+```{r fig.height=8, fig.width=8}
+
+resid_panel(step_model, plots='default', smoother = TRUE)
+
+```
+#### RMSE Calculation
+
+```{r}
+### RMSE of fourth model - training dataset
+rmse_calc(training_set$TARGET_WINS, predict(step_model, newdata = training_set))
+### RMSE of fourth model - test dataset
+rmse_calc(test_set$TARGET_WINS, predict(step_model, newdata = test_set))
+```
+#### Model Summary
+
+```{r}
+model_4 <- as.data.frame(glance(step_model))
+model_4$Train_RMSE <- rmse_calc(training_set$TARGET_WINS, predict(step_model, newdata = training_set))
+model_4$Test_RMSE <- rmse_calc(test_set$TARGET_WINS, predict(step_model, newdata = test_set))
+```
+
+## PART IV: Selecting Models
+
+### Compare Key statistics
+
+The table below summarizes the model statistics for all four of our models. The models are listed from left to right in accordance with the order in which they were described in Part III.
+
+```{r}
+model_summary <- rbind(model_1,model_2,model_3,model_4)
+
+Model_Name <- c('Model 1(All Features)','Model 2 (Selective Features)','Model 3(Selective Features)','Model 4(Stepwise - Backward Elimination)')
+
+model_summary <- t(model_summary) 
+colnames(model_summary) <- Model_Name
+
+model_summary %>% kable() %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%  scroll_box(width="100%",height="300px")
+
+```
+
+### Model Interpretation
+
+Between the four models, we looked at the relevant diagnostic plots like residual plot, Q-Q plot, Histogram etc. We also revewed the adjusted R square and computed RMSE numbers for all 4 models. 
+
+We have decided to go with Model 4 which showed maximum Adj. R squared and minimum RMSE values. Below are the coefficients for the selected best model.
+
+```{r}
+model_coefficients <- step_model$coefficients
+
+model_coefficients
+
+```
+
+### Model Prediction
+
+```{r}
+lm_predicted <- round(predict(step_model, newdata = eval_df),0)
+
+lm_predicted_df <- as.data.frame(cbind(eval_df$INDEX, lm_predicted))
+
+colnames(lm_predicted_df) <- c('INDEX','TARGET_WINS')
+
+lm_predicted_df %>% kable() %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%  scroll_box(width="100%",height="300px")
+```
+
+### Statistical summary of the Prediction Output
+
+```{r}
+
+result_summary <- round(rbind(as.data.frame(describe(train_df %>% dplyr::select(TARGET_WINS))),
+                        as.data.frame(describe(lm_predicted_df %>% dplyr::select(TARGET_WINS)))),0)
+
+dataset_label <- data.frame(c('Training Data','Model Prediction'))
+
+result_summary <- cbind(dataset_label,result_summary)
+names(result_summary)[1] <- 'Data Set'
+rownames(result_summary) <- NULL
+
+result_summary  %>% kable() %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%  scroll_box(width="100%",height="300px")
+
+```
+
+### Conclusion
+
+Based on the above table, mean and median of the training data set and prediction output are pretty close with prediction range 13 and 122. So even if not perfect, but the model output seems to be within acceptable levels of accuracy. But definitely there are further improvements that can be applied on this model. Probably more advanced technique and domain knowledge can be used to better handle outliers present in the training data set to improve the model quality.
+
+### Model output
+
+```{r}
+# export to .csv for submission
+write.csv(lm_predicted_df, file = "C:/CUNY/Semester4(Spring)/DATA 621/Assignments/Homework1/Output/moneyball_submission.csv",row.names = FALSE)
+```
+Our model prediction output can be found in the below GitHub location -
+
+[Model Output](https://raw.githubusercontent.com/soumya2g/CUNYDataMiningHomeWork/master/HomeWork_1/Output/moneyball_submission.csv)
+
+## References:
+
+Multicollinearity & VIF - [Multicollinearity essentials and VIF in R](http://www.sthda.com/english/articles/39-regression-model-diagnostics/160-multicollinearity-essentials-and-vif-in-r/)
+
+Broom Package - [Model Summary Statistics](https://cran.r-project.org/web/packages/broom/vignettes/broom.html)
+
+MICE Tutorial for Imputation - [MICE Package](https://datascienceplus.com/imputing-missing-data-with-r-mice-package/)
