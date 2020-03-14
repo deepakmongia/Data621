@@ -1,0 +1,179 @@
+---
+title: "Homework-2_Classification_Metrics"
+author: "Deepak Mongia & Soumya Ghosh"
+date: "3/14/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(pROC)
+library(kableExtra)
+```
+
+## Introduction
+
+As a part of this homework assignment, we have been given a dataset called classification-output-data.csv, which has a set of independent varibles or features and a class, along with a predictive classification model scored probability and scored class based on the scored probability. We have to use the below 3 key columns to derive some key classification model metrics.
+ class: the actual class for the observation
+ scored.class: the predicted class for the observation (based on a threshold of 0.5)
+ scored.probability: the predicted probability of success for the observation
+
+### 1. Download the classification output data set
+
+Loading the dataset into R:
+```{r}
+hw_dataset <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/master/HW-2/Data/classification-output-data.csv",
+                       header = TRUE)
+
+```
+
+### 2. Understanding the dataset:
+
+Use the table() function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?
+
+```{r}
+summary(hw_dataset)
+
+table(hw_dataset$class) %>% kable()
+table(hw_dataset$scored.class) %>% kable()
+```
+
+As we see above, there are 2 class columns - one being the actual class and other being the predicted class based on a classification model.
+Classification model's scored probability is also given along.
+We will now work on the 3 columns to get few important metrics to understand how the model performed.
+
+### 3. Calculating the accuracy:
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.
+
+```{r}
+Accuracy_func <- function(input_df){
+  True_positive_plus_negative <- sum(input_df$class == input_df$scored.class)
+  False_positive_plus_negative <- sum(input_df$class != input_df$scored.class)
+  
+  Accuracy <- True_positive_plus_negative / (True_positive_plus_negative + False_positive_plus_negative)
+  return(Accuracy)
+}
+
+```
+
+### 4. Calculating the classification error rate:
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions.
+
+```{r}
+Class_error_rt_func <- function(input_df){
+  True_positive_plus_negative <- sum(input_df$class == input_df$scored.class)
+  False_positive_plus_negative <- sum(input_df$class != input_df$scored.class)
+  
+  error_rate <- False_positive_plus_negative / (True_positive_plus_negative + False_positive_plus_negative)
+  return(error_rate)
+}
+```
+
+Verify that you get an accuracy and an error rate that sums to one.
+
+```{r}
+Accuracy_func(hw_dataset) + Class_error_rt_func(hw_dataset)
+```
+
+
+### 5. Calculation Precision:
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.
+
+```{r}
+Precision_func <- function(input_df) {
+  True_positive <- sum(input_df$class == 1 & input_df$scored.class == 1)
+  False_positive <- sum(input_df$class == 0 & input_df$scored.class == 1)
+  
+  Precision_val <- True_positive / (True_positive + False_positive)
+  
+  return(Precision_val)
+}
+
+```
+
+### 6. Calculating Sensitivity:
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.
+
+```{r}
+Sensitivity_func <- function(input_df) {
+  True_positive <- sum(input_df$class == 1 & input_df$scored.class == 1)
+  False_negative <- sum(input_df$class == 1 & input_df$scored.class == 0)
+  
+  Sensitivity_val <- True_positive / (True_positive + False_negative)
+  
+  return(Sensitivity_val)
+}
+
+```
+
+### 7. Calculating Specificity:
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the specificity of the predictions.
+
+```{r}
+Specificity_func <- function(input_df) {
+  True_negative <- sum(input_df$class == 0 & input_df$scored.class == 0)
+  False_positive <- sum(input_df$class == 0 & input_df$scored.class == 1)
+  
+  Specificity_val <- True_negative / (True_negative + False_positive)
+  
+  return(Specificity_val)
+}
+
+```
+
+### 8. Calculating F1 score:
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions.
+
+```{r}
+f1score_func <- function(input_df) {
+
+  Precision_val <- Precision_func(input_df)
+  Sensitivity_val <- Sensitivity_func(input_df)
+  
+  f1score_val <- ( 2 * Precision_val * Sensitivity_val ) / (Precision_val + Sensitivity_val)
+  return(f1score_val)
+  
+}
+```
+
+### 10. Building the ROC curve:
+
+Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.
+
+```{r}
+ROC_func <- function(input_df) {
+  roc_df <- data.frame()
+  for (threshold in seq(0, 1, by = 0.01))
+  {
+    input_df_int <- data.frame(input_df)
+    input_df_int$scored.class <- ifelse(input_df_int$scored.probability > threshold, 1, 0)
+    roc_df <- rbind(roc_df, data.frame(1 - Specificity_func(input_df_int),
+                                     Sensitivity_func(input_df_int)))
+  
+  }
+  
+  colnames(roc_df) <- c("FPR", "TPR")
+  
+  roc_curve <- ggplot(data = roc_df, aes(x = FPR, y = TPR)) + geom_point()
+  
+  return(roc_curve)
+  
+}
+```
+
+Plotting the ROC curve:
+```{r}
+ROC_func(hw_dataset)
+```
+
