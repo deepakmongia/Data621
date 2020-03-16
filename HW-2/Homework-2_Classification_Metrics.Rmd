@@ -38,10 +38,15 @@ hw_dataset <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/m
 Use the table() function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?
 
 ```{r}
+
+hw_dataset$class <- as.factor(hw_dataset$class)
+hw_dataset$scored.class <- as.factor(hw_dataset$scored.class)
+
 summary(hw_dataset)
 
-table(hw_dataset$class) %>% kable()
-table(hw_dataset$scored.class) %>% kable()
+confusion_matrix <- table(hw_dataset$scored.class, hw_dataset$class)
+confusion_matrix %>% kable()
+
 ```
 
 As we see above, there are 2 class columns - one being the actual class and other being the predicted class based on a classification model.
@@ -50,6 +55,8 @@ We will now work on the 3 columns to get few important metrics to understand how
 
 ### 3. Calculating the accuracy:
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.
+
+$Accuracy\quad =\quad \frac { TP+TN }{ TP+FP+TN+FN }$
 
 ```{r}
 Accuracy_func <- function(input_df){
@@ -65,6 +72,8 @@ Accuracy_func <- function(input_df){
 ### 4. Calculating the classification error rate:
 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions.
+
+$Classification\quad Error\quad Rate\quad =\quad \frac { FP+FN }{ TP+FP+TN+FN }$
 
 ```{r}
 Class_error_rt_func <- function(input_df){
@@ -87,6 +96,8 @@ Accuracy_func(hw_dataset) + Class_error_rt_func(hw_dataset)
 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.
 
+$Precision\quad =\quad \frac { TP }{ TP+FP }$
+
 ```{r}
 Precision_func <- function(input_df) {
   True_positive <- sum(input_df$class == 1 & input_df$scored.class == 1)
@@ -102,6 +113,8 @@ Precision_func <- function(input_df) {
 ### 6. Calculating Sensitivity:
 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.
+
+$Sensitivity\quad =\quad \frac { TP }{ TP+FN }$
 
 ```{r}
 Sensitivity_func <- function(input_df) {
@@ -119,6 +132,8 @@ Sensitivity_func <- function(input_df) {
 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the specificity of the predictions.
 
+$Specificity\quad =\quad \frac { TN }{ TN+FP }$
+
 ```{r}
 Specificity_func <- function(input_df) {
   True_negative <- sum(input_df$class == 0 & input_df$scored.class == 0)
@@ -135,6 +150,8 @@ Specificity_func <- function(input_df) {
 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions.
 
+$F1\quad Score\quad =\quad \frac { 2*Precision*Sensitivity }{ Precision\quad +\quad Sensitivity }$
+
 ```{r}
 f1score_func <- function(input_df) {
 
@@ -146,6 +163,24 @@ f1score_func <- function(input_df) {
   
 }
 ```
+
+### 9. Bounds of F1 Score
+
+Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If $0<a<1$ and $0<b<1$ then $ab<a$.)
+
+Expanding the definition of F1 Score as below -
+
+$F1\quad Score\quad =\quad \frac { 2*Precision*Sensitivity }{ Precision\quad +\quad Sensitivity } \\ \\ \quad \quad \quad \quad \quad \quad \quad \quad =\quad \frac { 2*\frac { TP }{ TP+FP } *\frac { TP }{ TP+FN }  }{ \frac { TP }{ TP+FP } +\frac { TP }{ TP+FN }  } \\ \quad \quad \quad \quad \quad \quad \quad \quad =\quad \frac { \frac { 2*{ TP }^{ 2 } }{ (TP+FP)(TP+FN) }  }{ \frac { TP(2TP+FP+FN) }{ (TP+FP)(TP+FN) }  } \\ \quad \quad \quad \quad \quad \quad \quad \quad =\quad \frac { 2TP }{ 2TP+FP+FN }$
+
+In the equation above, TP, FP & FN are all positive integers. $TP,FP,FN\quad \in \quad N\quad where\quad N\quad =\quad \{ 0,1,2,3,...\}$
+
+So mathematically, 2TP $\le$ 2TP+FP+FN. Hence Numerator is at most equal to denominator. Hence F1 Score $\le$ 1.
+
+The fraction, $\frac { 2TP }{ 2TP+FP+FN }$ will have a minimum value of Zero when TP = 0 and maximum value of 1 when FP = FN = 0.
+
+Hence it can be conculded that $0\quad \le \quad F1\quad \le \quad 1$.
+
+
 
 ### 10. Building the ROC curve:
 
@@ -165,15 +200,124 @@ ROC_func <- function(input_df) {
   
   colnames(roc_df) <- c("FPR", "TPR")
   
-  roc_curve <- ggplot(data = roc_df, aes(x = FPR, y = TPR)) + geom_point()
+  roc_curve <- ggplot(data = roc_df, aes(x = FPR, y = TPR)) + geom_point() +
+                geom_path()
   
-  return(roc_curve)
+  roc_df2 <- as.data.frame(roc_df)
+  roc_df2 <- roc_df2[order(roc_df2$FPR, roc_df2$TPR),]
+  
+  roc_df2 <- transform(roc_df2, 
+                    dFPR = c(diff(FPR), 0),
+                    dTPR = c(diff(TPR), 0))
+  
+  
+  simple_auc <- function(TPR, FPR){
+  # inputs already sorted, best scores first 
+  dFPR <- c(diff(FPR), 0)
+  dTPR <- c(diff(TPR), 0)
+  sum(TPR * dFPR) + sum(dTPR * dFPR)/2
+  }
+
+  auc_value <- with(roc_df2, simple_auc(TPR, FPR))
+
+  new_list <- list(roc_curve, auc_value)
+    
+  return(new_list)
   
 }
 ```
 
 Plotting the ROC curve:
 ```{r}
-ROC_func(hw_dataset)
+ROC_func_response <- ROC_func(hw_dataset)
+ROC_func_response[1]
 ```
 
+AUC Value:
+```{r}
+ROC_func_response[2]
+```
+
+### 11. Produce all the metrics values from the defined functions above:
+
+Use your **created R functions** and the provided classification output data set to produce all of the classification metrics discussed above.
+
+```{r}
+### Accuracy
+print(Accuracy_func(hw_dataset))
+
+### Classification Error rate
+print(Class_error_rt_func(hw_dataset))
+
+### Precision
+print(Precision_func(hw_dataset))
+
+### Sensitivity
+sensitivity_val <- Sensitivity_func(hw_dataset)
+print(sensitivity_val)
+
+### Specificity
+specificity_val <- Specificity_func(hw_dataset)
+print(specificity_val)
+
+### F1 score
+print(f1score_func(hw_dataset))
+```
+
+### 12. Comparing our metrics results with the metrics from the "caret" library.
+
+We will now use the "caret" library and see the confusion matrix, and get the sensitivity and specificity using the "caret" library.
+These should match our function outputs.
+
+```{r}
+library(caret)
+
+confusion_matrix_caret <- confusionMatrix(hw_dataset$scored.class, hw_dataset$class, positive = '1')
+
+## Confusion matrix from caret
+print(confusion_matrix_caret)
+
+## Confusion matrix from table function
+print(confusion_matrix)
+```
+
+Getting the sensitivity from caret and then comparing with our earlier calculated value:
+```{r}
+sensitivity_caret <- sensitivity(hw_dataset$scored.class, hw_dataset$class, positive = '1')
+
+### sensitivity from caret
+print(sensitivity_caret)
+
+### sensitivity from our function
+print(sensitivity_val)
+
+```
+
+
+Getting the specificity from caret and then comparing with our earlier calculated value:
+```{r}
+specificity_caret <- specificity(hw_dataset$scored.class, hw_dataset$class, positive = '1')
+
+### specificity from caret
+print(specificity_caret)
+
+### specificity from our function
+print(specificity_val)
+
+```
+
+
+### 13. ROC curve from pROC library
+
+```{r}
+roc_curve_proc <- roc(as.numeric(hw_dataset$class),
+                      as.numeric(hw_dataset$scored.probability))
+
+ggroc(roc_curve_proc)
+
+print(roc_curve_proc$auc)
+
+```
+
+### Conclusion:
+The ROC curve and the AUC values are similar from the caret function and the functions we built.
