@@ -1,0 +1,329 @@
+---
+title: "Data 622 - HW-3"
+author: "Deepak Mongia"
+date: "4/5/2020"
+output: html_document
+---
+
+### Overview:
+##### In this homework assignment, you will explore, analyze and model a data set containing information on crime for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime rate is above the median crime rate (1) or not (0).
+
+#### Our objective is to build a binary logistic regression model on the training data set to predict whether the neighborhood will be at risk for high crime levels. We will provide classifications and probabilities for the evaluation data set using your binary logistic regression model. Below is a short description of the variables of interest in the data set:
+
+- zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)
+
+- indus: proportion of non-retail business acres per suburb (predictor variable)
+
+- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)
+
+- nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)
+
+- rm: average number of rooms per dwelling (predictor variable)
+
+- age: proportion of owner-occupied units built prior to 1940 (predictor variable)
+
+- dis: weighted mean of distances to five Boston employment centers (predictor variable)
+
+- rad: index of accessibility to radial highways (predictor variable)
+
+- tax: full-value property-tax rate per $10,000 (predictor variable)
+
+- ptratio: pupil-teacher ratio by town (predictor variable)
+
+- black: 1000(Bk - 0.63)2 where Bk is the proportion of blacks by town (predictor variable)
+
+- lstat: lower status of the population (percent) (predictor variable)
+
+- medv: median value of owner-occupied homes in $1000s (predictor variable)
+
+- target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)
+
+
+#### Loading the packages and the dataset:
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(corrplot)
+library(pROC)
+library(kableExtra)
+library(cowplot)
+
+crime_raw <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/master/HW-3/Data/crime-training-data_modified.csv",
+                      header = TRUE)
+
+```
+
+#### Exploratory Data Analysis:
+```{r}
+print(dim(crime_raw))
+
+print(str(crime_raw))
+
+print(summary(crime_raw))
+
+print(head(crime_raw))
+
+### Checking for NAs
+any(is.na(crime_raw))
+```
+
+Basic data manipulations:
+```{r}
+crime_raw$target <- as.factor(crime_raw$target)
+crime_raw$chas <- as.factor(crime_raw$chas)
+table(crime_raw$target)
+table(crime_raw$chas)
+
+ggplot(crime_raw, aes(chas)) + geom_bar(aes(fill=chas))
+
+ggplot(crime_raw, aes(target)) + geom_bar(aes(fill=target))
+
+```
+
+As we see above, the dataset is a balanced one.
+
+#### Box Plots
+
+```{r fig.height=10, fig.width=10, warning=FALSE, message=FALSE}
+
+## Box plots:
+#gb1 <- boxplot(crime_raw$zn)
+#gb2 <- boxplot(crime_raw$indus)
+gb1 <- ggplot(data = crime_raw, aes(y = zn)) + geom_boxplot()
+gb2 <- ggplot(data = crime_raw, aes(y = indus)) + geom_boxplot()
+gb3 <- ggplot(data = crime_raw, aes(y = nox)) + geom_boxplot()
+gb4 <- ggplot(data = crime_raw, aes(y = rm)) + geom_boxplot()
+gb5 <- ggplot(data = crime_raw, aes(y = age)) + geom_boxplot()
+gb6 <- ggplot(data = crime_raw, aes(y = dis)) + geom_boxplot()
+gb7 <- ggplot(data = crime_raw, aes(y = rad)) + geom_boxplot()
+gb8 <- ggplot(data = crime_raw, aes(y = tax)) + geom_boxplot()
+gb9 <- ggplot(data = crime_raw, aes(y = ptratio)) + geom_boxplot()
+gb10 <- ggplot(data = crime_raw, aes(y = lstat)) + geom_boxplot()
+gb11 <- ggplot(data = crime_raw, aes(y = medv)) + geom_boxplot()
+
+
+plot_grid(gb1, gb2, gb3, gb4, gb5, gb6, gb7, gb8, gb9, gb10, gb11, labels = "AUTO, scale = 10")
+
+```
+
+#### Boxplot - for each variable by target value:
+```{r}
+
+gb12 <- ggplot(data = crime_raw, aes(x = target, y = ptratio)) + geom_boxplot()
+gb13 <- ggplot(data = crime_raw, aes(x = target, y = zn)) + geom_boxplot()
+gb14 <- ggplot(data = crime_raw, aes(x = target, y = nox)) + geom_boxplot()
+gb15 <- ggplot(data = crime_raw, aes(x = target, y = rm)) + geom_boxplot()
+gb16 <- ggplot(data = crime_raw, aes(x = target, y = age)) + geom_boxplot()
+gb17 <- ggplot(data = crime_raw, aes(x = target, y = dis)) + geom_boxplot()
+gb18 <- ggplot(data = crime_raw, aes(x = target, y = rad)) + geom_boxplot()
+gb19 <- ggplot(data = crime_raw, aes(x = target, y = tax)) + geom_boxplot()
+gb20 <- ggplot(data = crime_raw, aes(x = target, y = lstat)) + geom_boxplot()
+gb21 <- ggplot(data = crime_raw, aes(x = target, y = medv)) + geom_boxplot()
+
+
+plot_grid(gb12, gb13, gb14, gb15, gb16, gb17, gb18, gb19, gb20, gb21, labels = "AUTO, scale = 10")
+
+```
+
+
+#### Density plots
+
+```{r}
+crime_raw %>%
+  gather(variable, value, zn:indus, nox:medv) %>%
+  ggplot(., aes(value)) + 
+  geom_density(fill = "dodgerblue4", color="dodgerblue4") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = element_blank())
+
+```
+
+#### Checking Correlations
+```{r}
+crime_raw$chas <- as.numeric(as.character(crime_raw$chas))
+
+corrMatrix <- round(cor(crime_raw %>% select(-target)),4)
+
+corrMatrix %>% corrplot(., method = "color", outline = T, addgrid.col = "darkgray", order="hclust", addrect = 4, rect.col = "black", rect.lwd = 5,cl.pos = "b", tl.col = "indianred4", tl.cex = 1.0, cl.cex = 1.0, addCoef.col = "white", number.digits = 2, number.cex = 0.8, col = colorRampPalette(c("darkred","white","dodgerblue4"))(100))
+```
+
+The correlation between the 2 variables - rad and tax is very high (0.91) as we see from the above plot
+
+#### Splitting dataset into training and testing data set.
+
+```{r}
+#### SPLIT INTO TRAIN/TEST
+n <- nrow(crime_raw)
+set.seed(123)
+crime_raw_random <- crime_raw[sample(nrow(crime_raw)), ]
+
+crime.train.df <- crime_raw_random[1:as.integer(0.7*n),]
+
+crime.test.df <- crime_raw_random[as.integer(0.7*n +1):n, ]
+
+table(crime.test.df$target) / nrow(crime.test.df)
+table(crime.train.df$target) / nrow(crime.train.df)
+
+```
+
+#### Building the Logistic models
+##### Model-1 - Building the model using all the variables first
+```{r}
+logitModel1 <- glm(target~., data = crime.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel1)
+
+```
+
+Predicting using the new model:
+```{r}
+predict_model1 <- predict(logitModel1, newdata = crime.test.df, type = "response")
+predict_model1_class <- ifelse(predict_model1 > 0.5, 1, 0)
+xtabs(~predict_model1_class + crime.test.df$target)
+
+
+predict_model1_train <- predict(logitModel1, newdata = crime.train.df, type = "response")
+predict_model1_train_class <- ifelse(predict_model1_train > 0.5, 1, 0)
+xtabs(~predict_model1_train_class + crime.train.df$target)
+
+```
+
+```{r}
+roc(crime.test.df$target, predict_model1, plot = TRUE)
+```
+
+So, even if the predictions are quite good, and the ROC curve is also impressive, but many variables are not statistically significant, so we will remove those variables and see how the model behaves.
+We are removing the following variables:
+zn
+indus
+chas
+rm
+age
+lstat
+
+##### Model-2 - Removing statistically insignificant variables
+```{r}
+logitModel2 <- glm(target~nox + dis + rad + tax + ptratio + medv, 
+                   data = crime.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel2)
+
+```
+
+Predicting using the new model
+```{r}
+predict_model2 <- predict(logitModel2, newdata = crime.test.df, type = "response")
+predict_model2_class <- ifelse(predict_model2 > 0.5, 1, 0)
+print(xtabs(~predict_model2_class + crime.test.df$target))
+
+predict_model2_train <- predict(logitModel2, newdata = crime.train.df, type = "response")
+predict_model2_train_class <- ifelse(predict_model2_train > 0.5, 1, 0)
+print(xtabs(~predict_model2_train_class + crime.train.df$target))
+
+```
+
+ROC curve:
+```{r}
+roc(crime.test.df$target, predict_model2, plot = TRUE)
+```
+
+#### Model 3 
+```{r}
+logitModel3 <- glm(target~nox + rad + tax + ptratio + medv, 
+                   data = crime.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel3)
+
+
+```
+
+Predicting using the new model
+```{r}
+predict_model3 <- predict(logitModel3, newdata = crime.test.df, type = "response")
+predict_model3_class <- ifelse(predict_model3 > 0.5, 1, 0)
+table(predict_model3_class, crime.test.df$target)
+xtabs(~predict_model3_class + crime.test.df$target)
+
+predict_model3_train <- predict(logitModel3, newdata = crime.train.df, type = "response")
+predict_model3_train_class <- ifelse(predict_model3_train > 0.5, 1, 0)
+xtabs(~predict_model3_train_class + crime.train.df$target)
+
+```
+
+ROC curve:
+```{r}
+roc(crime.test.df$target, predict_model3, plot = TRUE)
+```
+
+#### Removing medv to build a new model
+```{r}
+logitModel4 <- glm(target~nox + rad + tax + ptratio, 
+                   data = crime.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel4)
+
+```
+
+```{r}
+
+predict_model4 <- predict(logitModel4, newdata = crime.test.df, type = "response")
+predict_model4_class <- ifelse(predict_model4 > 0.5, 1, 0)
+xtabs(~predict_model4_class + crime.test.df$target)
+
+predict_model4_train <- predict(logitModel4, newdata = crime.train.df, type = "response")
+predict_model4_train_class <- ifelse(predict_model4_train > 0.5, 1, 0)
+xtabs(~predict_model4_train_class + crime.train.df$target)
+
+```
+
+ROC curve:
+```{r}
+roc(crime.test.df$target, predict_model4, plot = TRUE)
+```
+
+```{r}
+logitModel5 <- glm(target~nox + rad + tax, 
+                   data = crime.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel5)
+
+predict_model5 <- predict(logitModel5, newdata = crime.test.df, type = "response")
+predict_model5_class <- ifelse(predict_model5 > 0.5, 1, 0)
+xtabs(~predict_model5_class + crime.test.df$target)
+
+predict_model5_train <- predict(logitModel5, newdata = crime.train.df, type = "response")
+predict_model5_train_class <- ifelse(predict_model5_train > 0.5, 1, 0)
+xtabs(~predict_model5_train_class + crime.train.df$target)
+
+```
+
+```{r}
+roc(crime.test.df$target, predict_model5, plot = TRUE)
+```
+
+As all the models we built have around the same value of AUC, we will decide to go with model2 as it has the lowest AIC.
+
+```{r}
+summary(logitModel2)
+```
+
+#### Evaluation Dataset:
+We will now load the evaluation dataset, and predict the data:
+```{r}
+crime_evaluation_ds <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/master/HW-3/Data/crime-evaluation-data_modified.csv",
+                                header = TRUE)
+
+crime_evaluation_ds$pred_prob <- predict(logitModel2, newdata = crime_evaluation_ds, type = "response" )
+crime_evaluation_ds$pred_class <- ifelse(crime_evaluation_ds$pred_prob > 0.5, 1, 0)
+
+table(crime_evaluation_ds$pred_class)
+
+print(crime_evaluation_ds)
+```
+
