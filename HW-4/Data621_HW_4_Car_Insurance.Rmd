@@ -1,0 +1,697 @@
+---
+title: "Data621_HW_4_Car_Insurance"
+author: "Deepak Mongia"
+date: "4/13/2020"
+output: html_document
+---
+
+In this homework assignment, we will explore, analyze and model a data set containing approximately 8000 records representing a customer at an auto insurance company. Each record has two response variables. The first response variable, TARGET_FLAG, is a 1 or a 0. A “1” means that the person was in a car crash. A zero means that the person was not in a car crash. The second response variable is TARGET_AMT. This value is zero if the person did not crash their car. But if they did crash their car this number will be a value greater than zero.
+
+Our objective is to build multiple linear regression and binary logistic regression models on the training data to predict the probability that a person will crash their car and also the amount of money it will cost if the person does crash their car.
+
+Loading the libraries:
+```{r}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(mice)
+library(VIM)
+library(tidyr)
+library(pROC)
+```
+
+Loading the data, and exploring the data:
+```{r}
+insurance_raw <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/master/HW-4/Data/insurance_training_data.csv",
+                          header = TRUE, row.names = 1)
+
+print(head(insurance_raw))
+
+print(dim(insurance_raw))
+
+print(str(insurance_raw))
+print(summary(insurance_raw))
+
+insurance_raw$TARGET_FLAG <- as.factor(insurance_raw$TARGET_FLAG)
+
+ggplot(insurance_raw, aes(TARGET_FLAG)) + geom_bar(aes(fill=TARGET_FLAG))
+
+print(table(insurance_raw$TARGET_FLAG))
+
+```
+
+As we see above the people which have claimed (target flag = 1) are 2153 in number and who have not claimed (target flag = 0) are 6008. So it is an imbalanced dataset.
+
+### Missing data checks:
+```{r}
+### Blank data
+train_missing_df <- data.frame(apply(insurance_raw, 2, function(x) length(which(x == ''))))
+print(train_missing_df)
+
+### NA data
+train_na_df1 <- data.frame(apply(insurance_raw, 2, function(x) length(which(is.na(x)))))
+print(train_na_df1)
+
+```
+
+
+### Analyzing the independent features
+
+##### KIDSDRIV
+```{r}
+print(unique(insurance_raw$KIDSDRIV))
+
+ggplot(insurance_raw, aes(KIDSDRIV)) + geom_bar(aes(fill=KIDSDRIV))
+
+insurance_raw[insurance_raw$KIDSDRIV != 0,] %>% ggplot(aes(KIDSDRIV)) + 
+  geom_bar(aes(fill=KIDSDRIV))
+
+Adults_only_policies <- insurance_raw[insurance_raw$KIDSDRIV == 0,]
+with_kids_policies <- insurance_raw[insurance_raw$KIDSDRIV != 0,]
+
+table(Adults_only_policies$TARGET_FLAG) / nrow(Adults_only_policies)
+table(with_kids_policies$TARGET_FLAG) / nrow(with_kids_policies)
+
+```
+
+##### AGE
+```{r}
+### Age
+ggplot(insurance_raw, aes(AGE)) + geom_histogram(binwidth = 5)
+
+ggplot(insurance_raw, aes(AGE)) + geom_histogram(binwidth = 5) +
+  facet_grid(~TARGET_FLAG)
+
+ggplot(insurance_raw, aes(x = AGE, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+```
+
+##### HOMEKIDS
+```{r}
+### homekids
+unique(insurance_raw$HOMEKIDS)
+
+kids_0_insurance <- insurance_raw[insurance_raw$HOMEKIDS == 0,]
+kids_non0_insurance <- insurance_raw[insurance_raw$HOMEKIDS != 0,]
+
+
+kids_0_insurance$TARGET_FLAG <- as.integer(as.character(kids_0_insurance$TARGET_FLAG))
+kids_non0_insurance$TARGET_FLAG <- as.integer(as.character(kids_non0_insurance$TARGET_FLAG))
+
+ggplot(kids_0_insurance, aes(TARGET_FLAG)) + geom_histogram()
+ggplot(kids_non0_insurance, aes(TARGET_FLAG)) + geom_histogram()
+
+table(kids_0_insurance$TARGET_FLAG) / nrow(kids_0_insurance)
+
+table(kids_non0_insurance$TARGET_FLAG) / nrow(kids_non0_insurance)
+
+ggplot(insurance_raw, aes(x = HOMEKIDS, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+```
+
+##### years on job
+```{r}
+### Years on job
+ggplot(data = insurance_raw, aes(x = YOJ, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+ggplot(insurance_raw, aes(x = YOJ, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+
+```
+
+##### INCOME
+```{r}
+### INCOME
+any(is.na(insurance_raw$INCOME))
+
+any(insurance_raw$INCOME == '')
+
+insurance_raw$INCOME[insurance_raw$INCOME == ''] <- NA
+
+sum(is.na(insurance_raw$INCOME))
+
+insurance_raw$INCOME <- str_remove_all(insurance_raw$INCOME, "[$,]") %>% as.integer()
+
+ggplot(insurance_raw, aes(INCOME)) + geom_histogram() +
+  facet_grid(~TARGET_FLAG)
+
+ggplot(data = insurance_raw, aes(x = INCOME, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+```
+
+##### PARENT1
+```{r}
+### PARENT1
+xtabs(~insurance_raw$PARENT1 + insurance_raw$TARGET_FLAG)
+
+```
+
+##### HOME_VAL
+```{r}
+sum(is.na(insurance_raw$HOME_VAL))
+
+insurance_raw$HOME_VAL[insurance_raw$HOME_VAL == ''] <- NA
+
+sum(is.na(insurance_raw$HOME_VAL))
+
+insurance_raw$HOME_VAL <- str_remove_all(insurance_raw$HOME_VAL, "[$,]") %>% as.integer()
+
+ggplot(insurance_raw, aes(HOME_VAL)) + geom_histogram() +
+  facet_grid(~TARGET_FLAG)
+
+ggplot(data = insurance_raw, aes(x = HOME_VAL, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+
+```
+
+##### Marital status
+```{r}
+unique(insurance_raw$MSTATUS)
+
+ggplot(data = insurance_raw, aes(x = MSTATUS)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+insurance_raw %>% 
+  ggplot(aes(MSTATUS)) +
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+
+```
+
+##### sex
+```{r}
+
+ggplot(data = insurance_raw, aes(x = SEX)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+
+```
+
+##### education
+```{r}
+unique(insurance_raw$EDUCATION)
+
+ggplot(data = insurance_raw, aes(x = EDUCATION)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+```
+
+##### job
+```{r}
+unique(insurance_raw$JOB)
+
+insurance_raw$JOB[insurance_raw$JOB == ''] <- NA
+
+ggplot(data = insurance_raw, aes(x = JOB)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+```
+
+##### TRAVTIME
+```{r}
+
+ggplot(insurance_raw, aes(x = TRAVTIME, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+ggplot(data = insurance_raw, aes(x = TRAVTIME, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+```
+
+##### CAR_USE
+```{r}
+unique(insurance_raw$CAR_USE)
+
+ggplot(data = insurance_raw, aes(x = CAR_USE)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+
+```
+
+##### BLUEBOOK
+```{r}
+sum(insurance_raw$BLUEBOOK == '')
+
+insurance_raw$BLUEBOOK <- str_remove_all(insurance_raw$BLUEBOOK, "[$,]") %>% as.integer()
+
+#ggplot(insurance_raw, aes(BLUEBOOK)) + geom_histogram() +
+#  facet_grid(~TARGET_FLAG)
+
+#ggplot(insurance_raw, aes(x = BLUEBOOK, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+#  geom_histogram()
+
+ggplot(insurance_raw, aes(x = BLUEBOOK, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+ggplot(data = insurance_raw, aes(x = BLUEBOOK, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+```
+
+##### Time in force - TIF
+```{r}
+
+ggplot(insurance_raw, aes(x = TIF, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+ggplot(data = insurance_raw, aes(x = TIF, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+```
+
+##### CAR_TYPE
+```{r}
+
+unique(insurance_raw$CAR_TYPE)
+
+ggplot(data = insurance_raw, aes(x = CAR_TYPE)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+```
+
+##### RED_CAR
+```{r}
+
+unique(insurance_raw$RED_CAR)
+
+ggplot(data = insurance_raw, aes(x = RED_CAR)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+RED_CAR_xtabs <- xtabs(~insurance_raw$RED_CAR + insurance_raw$TARGET_FLAG)
+
+print(RED_CAR_xtabs)
+
+RED_CAR_xtabs[1,] <- RED_CAR_xtabs[1,] / sum(RED_CAR_xtabs[1,])
+RED_CAR_xtabs[2,] <- RED_CAR_xtabs[2,] / sum(RED_CAR_xtabs[2,])
+print(RED_CAR_xtabs)
+
+```
+
+#####OLDCLAIM
+```{r}
+sum(insurance_raw$OLDCLAIM == '')
+
+insurance_raw$OLDCLAIM <- str_remove_all(insurance_raw$OLDCLAIM, "[$,]") %>% as.integer()
+
+ggplot(insurance_raw, aes(x = OLDCLAIM, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+ggplot(data = insurance_raw, aes(x = OLDCLAIM, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+ggplot(data = insurance_raw, aes(x = OLDCLAIM, y = TARGET_AMT)) + geom_point()
+
+
+```
+
+```{r}
+### CLM_FREQ
+unique(insurance_raw$CLM_FREQ)
+
+ggplot(data = insurance_raw, aes(x = CLM_FREQ)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+CLM_FREQ_xtabs <- xtabs(~insurance_raw$CLM_FREQ + insurance_raw$TARGET_FLAG)
+
+print(CLM_FREQ_xtabs)
+
+CLM_FREQ_xtabs[1,] <- CLM_FREQ_xtabs[1,] / sum(CLM_FREQ_xtabs[1,])
+CLM_FREQ_xtabs[2,] <- CLM_FREQ_xtabs[2,] / sum(CLM_FREQ_xtabs[2,])
+CLM_FREQ_xtabs[3,] <- CLM_FREQ_xtabs[3,] / sum(CLM_FREQ_xtabs[3,])
+CLM_FREQ_xtabs[4,] <- CLM_FREQ_xtabs[4,] / sum(CLM_FREQ_xtabs[4,])
+CLM_FREQ_xtabs[5,] <- CLM_FREQ_xtabs[5,] / sum(CLM_FREQ_xtabs[5,])
+CLM_FREQ_xtabs[6,] <- CLM_FREQ_xtabs[6,] / sum(CLM_FREQ_xtabs[6,])
+
+print(CLM_FREQ_xtabs)
+
+```
+
+```{r}
+### REVOKED
+unique(insurance_raw$REVOKED)
+
+ggplot(data = insurance_raw, aes(x = REVOKED)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+REVOKED_xtabs <- xtabs(~insurance_raw$REVOKED + insurance_raw$TARGET_FLAG)
+
+print(REVOKED_xtabs)
+
+REVOKED_xtabs[1,] <- REVOKED_xtabs[1,] / sum(REVOKED_xtabs[1,])
+REVOKED_xtabs[2,] <- REVOKED_xtabs[2,] / sum(REVOKED_xtabs[2,])
+print(REVOKED_xtabs)
+
+```
+
+##### MVR_PTS
+```{r}
+
+print(summary(insurance_raw$MVR_PTS))
+print(unique(insurance_raw$MVR_PTS))
+
+ggplot(insurance_raw, aes(x = MVR_PTS, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+ggplot(data = insurance_raw, aes(x = MVR_PTS, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+```
+
+##### CAR_AGE
+```{r}
+
+summary(insurance_raw$CAR_AGE)
+
+ggplot(insurance_raw, aes(x = CAR_AGE, group = TARGET_FLAG, fill = TARGET_FLAG)) + 
+  geom_histogram(position = "dodge")
+
+ggplot(data = insurance_raw, aes(x = CAR_AGE, y = TARGET_FLAG)) + geom_point() +
+  geom_jitter()
+
+```
+
+```{r}
+### urbanicity
+
+print(summary(insurance_raw$URBANICITY))
+print(unique(insurance_raw$URBANICITY))
+
+
+ggplot(data = insurance_raw, aes(x = URBANICITY)) + 
+  geom_bar(aes(fill = TARGET_FLAG), position = position_dodge())
+
+URBANICITY_xtabs <- xtabs(~insurance_raw$URBANICITY + insurance_raw$TARGET_FLAG)
+
+print(URBANICITY_xtabs)
+
+URBANICITY_xtabs[1,] <- URBANICITY_xtabs[1,] / sum(URBANICITY_xtabs[1,])
+URBANICITY_xtabs[2,] <- URBANICITY_xtabs[2,] / sum(URBANICITY_xtabs[2,])
+print(URBANICITY_xtabs)
+
+```
+
+#### Imputing the missing data
+We will impute only the numerical missing data. We also have 1 feature which is categorical and missing some data. We will not impute the missing categorical data - feature JOB, and instead we will drop the records having NA in this feature.
+Rest all missing data is the numerical field data, and we are using the mice package below to impute it.
+```{r}
+
+#sum(!complete.cases(insurance_raw))
+
+summary(insurance_raw$YOJ)
+
+summary(insurance_raw$AGE)
+
+summary(insurance_raw$INCOME)
+
+summary(insurance_raw$HOME_VAL)
+
+summary(insurance_raw$JOB)
+
+summary(insurance_raw$CAR_AGE)
+
+
+md.pattern(insurance_raw)
+
+insurance_raw2 <- insurance_raw %>% drop_na(JOB)
+
+aggr_plot <- aggr(insurance_raw2, col=c('navyblue','red'), 
+                  numbers=TRUE, sortVars=TRUE, 
+                  labels=names(insurance_raw), cex.axis=.7, 
+                  gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+
+
+insurance_raw_imputed <- mice(data = insurance_raw2, m = 1,
+                              method = "pmm", maxit = 5, seed = 500)
+
+insurance_raw_imputed_df <- mice::complete(insurance_raw_imputed, 1)
+
+head(insurance_raw_imputed_df)
+
+summary(insurance_raw$YOJ)
+summary(insurance_raw_imputed_df$YOJ)
+
+summary(insurance_raw$AGE)
+summary(insurance_raw_imputed_df$AGE)
+
+summary(insurance_raw$INCOME)
+summary(insurance_raw_imputed_df$INCOME)
+
+summary(insurance_raw$HOME_VAL)
+summary(insurance_raw_imputed_df$HOME_VAL)
+
+summary(insurance_raw$JOB)
+summary(insurance_raw_imputed_df$JOB)
+
+summary(insurance_raw$CAR_AGE)
+summary(insurance_raw_imputed_df$CAR_AGE)
+
+```
+
+Now all the data is present. So we can start building our models.
+
+### Model Building
+#### Train-test Split
+We are splitting our data into training and test dataset - first for our classification  problem.
+```{r}
+#### Splitting the dataset into test and train dataset
+n <- nrow(insurance_raw_imputed_df)
+set.seed(123)
+insurance_random_index <- insurance_raw_imputed_df[sample(n), ]
+
+insurance.train.df <- insurance_random_index[1:as.integer(0.7*n),]
+
+insurance.test.df <- insurance_random_index[as.integer(0.7*n +1):n, ]
+
+table(insurance.test.df$TARGET_FLAG) / nrow(insurance.test.df)
+table(insurance.train.df$TARGET_FLAG) / nrow(insurance.train.df)
+
+```
+
+#### Building our first classification model
+
+Taking all features
+```{r}
+### Building the first Logistic Regression model using all the variables:
+
+logitModel1 <- glm(TARGET_FLAG ~ . - TARGET_AMT, data = insurance.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel1)
+
+
+```
+
+
+Removing the 4 statistically insignificant features from the model:
+1. AGE
+2. HOMEKIDS
+3. YOJ
+4. CAR_AGE
+
+```{r}
+logitModel2 <- glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS +
+                     SEX + EDUCATION + JOB + TRAVTIME + CAR_USE + BLUEBOOK + TIF +
+                     CAR_TYPE + RED_CAR + OLDCLAIM +CLM_FREQ + REVOKED + MVR_PTS +
+                     URBANICITY
+                     , data = insurance.train.df,
+                   family = binomial(link = "logit"))
+
+summary(logitModel2)
+
+```
+
+This model looks good. Checking the results and metrics below.
+```{r}
+predict_logit2 <- predict(logitModel2, newdata = insurance.test.df, type = "response")
+predict_logit2_class <- ifelse(predict_logit2 > 0.5, 1, 0)
+print(xtabs(~predict_logit2_class + insurance.test.df$TARGET_FLAG))
+
+```
+
+```{r}
+roc(insurance.test.df$TARGET_FLAG, predict_logit2, plot = TRUE)
+
+```
+
+Defining the metrics functions.
+```{r, echo=FALSE}
+Accuracy_func <- function(actual_labels, predicted_labels){
+  True_positive_plus_negative <- sum(actual_labels == predicted_labels)
+  False_positive_plus_negative <- sum(actual_labels != predicted_labels)
+  
+  Accuracy <- True_positive_plus_negative / (True_positive_plus_negative + False_positive_plus_negative)
+  return(Accuracy)
+}
+
+Precision_func <- function(actual_labels, predicted_labels) {
+  True_positive <- sum(actual_labels == 1 & predicted_labels == 1)
+  False_positive <- sum(actual_labels == 0 & predicted_labels == 1)
+  
+  Precision_val <- True_positive / (True_positive + False_positive)
+  
+  return(Precision_val)
+}
+
+Sensitivity_func <- function(actual_labels, predicted_labels) {
+  True_positive <- sum(actual_labels == 1 & predicted_labels == 1)
+  False_negative <- sum(actual_labels == 1 & predicted_labels == 0)
+  
+  Sensitivity_val <- True_positive / (True_positive + False_negative)
+  
+  return(Sensitivity_val)
+}
+
+Specificity_func <- function(actual_labels, predicted_labels) {
+  True_negative <- sum(actual_labels == 0 & predicted_labels == 0)
+  False_positive <- sum(actual_labels == 0 & predicted_labels == 1)
+  
+  Specificity_val <- True_negative / (True_negative + False_positive)
+  
+  return(Specificity_val)
+}
+
+```
+
+```{r}
+Accuracy_func(insurance.test.df$TARGET_FLAG, predict_logit2_class)
+Precision_func(insurance.test.df$TARGET_FLAG, predict_logit2_class)
+Sensitivity_func(insurance.test.df$TARGET_FLAG, predict_logit2_class)
+Specificity_func(insurance.test.df$TARGET_FLAG, predict_logit2_class)
+
+```
+
+This looks to be our good model for classifying the data into whether the claim was filed or not by a customer.
+
+### Model to predict the target amount:
+We are taking only the rows which have target_flag = 1, as target_flag = 0 means 0 target_amount.
+
+```{r}
+insurance_raw_claim <- insurance_raw_imputed_df[insurance_raw_imputed_df$TARGET_FLAG == 1,]
+nrow(insurance_raw_claim)
+
+```
+
+
+```{r}
+# Now we will use this dataset to determine / predict the cost
+
+boxplot(insurance_raw_claim$TARGET_AMT)
+summary(insurance_raw_claim$TARGET_AMT)
+
+```
+
+Splitting into train and test dataset.
+```{r}
+n2 <- nrow(insurance_raw_claim)
+
+set.seed(123)
+insurance_claim_random_index <- insurance_raw_claim[sample(n2), ]
+
+insurance.claim.train.df <- insurance_claim_random_index[1:as.integer(0.8*n2),]
+
+insurance.claim.test.df <- insurance_claim_random_index[as.integer(0.8*n2 +1):n2, ]
+
+```
+
+Building Linear regression model using all features.
+```{r}
+linear_model1 <- lm(TARGET_AMT ~ KIDSDRIV + AGE + HOMEKIDS + YOJ + INCOME +
+                    PARENT1 +HOME_VAL + MSTATUS + SEX + EDUCATION + JOB + TRAVTIME +
+                    CAR_USE + BLUEBOOK + TIF + CAR_TYPE + RED_CAR + OLDCLAIM + CLM_FREQ +
+                    REVOKED + MVR_PTS + CAR_AGE + URBANICITY
+                    , data = insurance.claim.train.df)
+
+summary(linear_model1)
+```
+
+Removing features.
+```{r}
+
+linear_model3 <- lm(TARGET_AMT ~ BLUEBOOK + REVOKED + MVR_PTS + CAR_AGE
+                    , data = insurance.claim.train.df)
+
+summary(linear_model3)
+
+```
+
+
+This is our final model.
+
+### Evaluation dataset
+```{r}
+eval_df <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/master/HW-4/Data/insurance-evaluation-data.csv",
+                    header = TRUE, row.names = 1)
+
+dim(eval_df)
+anyNA(eval_df)
+
+```
+
+### Check missing data
+```{r}
+
+eval_missing_df <- data.frame(apply(eval_df, 2, function(x) length(which(x == ''))))
+eval_missing_df
+
+eval_na_df1 <- data.frame(apply(eval_df, 2, function(x) length(which(is.na(x)))))
+eval_na_df1
+
+```
+
+#### Converting blank data to NA
+```{r}
+eval_df$INCOME[eval_df$INCOME == ''] <- NA
+eval_df$HOME_VAL[eval_df$HOME_VAL == ''] <- NA
+eval_df$JOB[eval_df$JOB == ''] <- NA
+
+eval_df$INCOME <- str_remove_all(eval_df$INCOME, "[$,]") %>% as.integer()
+eval_df$HOME_VAL <- str_remove_all(eval_df$HOME_VAL, "[$,]") %>% as.integer()
+eval_df$BLUEBOOK <- str_remove_all(eval_df$BLUEBOOK, "[$,]") %>% as.integer()
+eval_df$OLDCLAIM <- str_remove_all(eval_df$OLDCLAIM, "[$,]") %>% as.integer()
+
+
+```
+
+#### Imput missing data
+```{r}
+eval_df1 <- subset(eval_df, select= -c(TARGET_FLAG, TARGET_AMT, JOB))
+eval_df2 <- subset(eval_df, select= c(TARGET_FLAG, TARGET_AMT, JOB))
+
+eval_df_imputed <- mice(data = eval_df1, m = 1,
+                        method = "pmm", maxit = 5, seed = 500)
+
+eval_df_imputed_df <- mice::complete(eval_df_imputed, 1)
+
+```
+
+```{r}
+eval_final_df <- cbind(eval_df_imputed_df, eval_df2)
+
+head(eval_final_df)
+dim(eval_final_df)
+eval_final_df <- eval_final_df[,c(23,24, 1:10, 25, 11:22)]
+```
+
+#### Classifying the evaluate dataset into claim = 0 or 1
+```{r}
+predict_eval_logit2 <- predict(logitModel2, newdata = eval_final_df, type = "response")
+eval_final_df$TARGET_FLAG <- ifelse(predict_eval_logit2 > 0.5, 1, 0)
+
+```
+
+#### Predicting the claim amount, and generating the final evaluated dataset
+```{r}
+eval_amt_df <- eval_final_df[eval_final_df$TARGET_FLAG == 1, ]
+
+eval_amt_df$TARGET_AMT <- predict(linear_model3, newdata = eval_amt_df)
+
+eval_final_df <- rbind(eval_final_df[eval_final_df$TARGET_FLAG == 0, ], eval_amt_df)
+
+```
+
