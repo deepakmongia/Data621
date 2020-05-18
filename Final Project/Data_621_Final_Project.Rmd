@@ -1,0 +1,971 @@
+---
+title: "Data621_Final_Project"
+author: "Deepak Mongia"
+date: "5/15/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+### Data 621 - Final Project
+
+For this project, we are going to work on a Housing dataset which gives around 80 independent features of around 2900 houses and their locality in the city of Ames, Iowa. The dataset was actually created for academia by a professor using the raw data coming from the Assessor’s Office in the form of a data dump from their records system.
+As a part of this project, we are analyzing this raw data and understand how the sale price is dependent on these features.
+
+#### Data - Introduction
+Ask a home buyer to describe their dream house, and they probably won't begin with the height of the basement ceiling or the proximity to an east-west railroad. But this playground competition's dataset proves that much more influences price negotiations than the number of bedrooms or a white-picket fence.
+With 79 explanatory variables describing (almost) every aspect of residential homes in Ames, Iowa, this is a real world data set which needs to be explored further to understand how the Sale Price of a house in the city of Ames, Iowa can be determined.
+
+Data Source: https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data
+
+Out of the 80 total variables, 44 are categorical variables like: Street: Type of road access to property which has 2 values - "Grvl" (for Gravel) and "Pave" for Paved. Remaining 36 variables are numeric features.
+Response or Target feature is the Sale price of a unit which is going to be our element / feature of interest for the prediction - based on the independent features.
+
+All the variables description is given in this file:
+https://raw.githubusercontent.com/deepakmongia/Data621/master/Final%20Project/Data/data_description.txt
+
+Let us now start with the work.
+We will load our required libraries first, load the dataset, and see the basic EDA features of the dataset.
+
+###### Loading the libraries
+```{r}
+library(ggplot2)
+library(ggmap)
+library(cowplot)
+library(corrplot)
+library(dplyr)
+library(mice)
+library(VIM)
+library(corrplot)
+library(gridExtra)
+library(ggResidpanel)
+library(pdp)
+
+```
+
+###### Loading the dataset and exploring the dataset
+```{r}
+housing2_raw <- read.csv("https://raw.githubusercontent.com/deepakmongia/Data621/master/Final%20Project/Data/train.csv",
+                        header = TRUE, row.names = 1)
+
+
+dim(housing2_raw)
+
+colnames(housing2_raw)
+
+summary(housing2_raw)
+
+head(housing2_raw)
+
+```
+
+###### Check if we have any missing data
+Let us first check if we have any columns with blank data
+```{r}
+train_missing_df1 <- data.frame(apply(housing2_raw, 2, function(x) length(which(x == ''))))
+colnames(train_missing_df1) <- "counts"
+train_missing_df1$column_name <- rownames(train_missing_df1)
+train_missing_df1 <- data.frame(train_missing_df1[train_missing_df1$counts > 0,])
+print(train_missing_df1)
+
+```
+
+So there is no data which is blank.
+
+Let us check NA data now
+```{r}
+train_na_df1 <- data.frame(apply(housing2_raw, 2, function(x) length(which(is.na(x)))))
+
+colnames(train_na_df1) <- "counts"
+train_na_df1$column_name <- rownames(train_na_df1)
+train_na_df1 <- data.frame(train_na_df1[train_na_df1$counts > 0,])
+print(train_na_df1)
+
+```
+
+So, we have NA data in both numeric as well as categorical data.
+We will deal with NA data ahead.
+
+###### Impute numeric data
+Let us now impute the missing / NA numeric features
+```{r}
+#### Impute Numeric data
+for (i in nrow(housing2_raw)) {
+  housing2_raw$LotFrontage <- ifelse(is.na(housing2_raw$LotFrontage), 
+                                     median(housing2_raw$LotFrontage, na.rm = TRUE),
+                                     housing2_raw$LotFrontage)
+}
+
+for (i in nrow(housing2_raw)) {
+  housing2_raw$MasVnrArea <- ifelse(is.na(housing2_raw$MasVnrArea), 
+                                     median(housing2_raw$MasVnrArea, na.rm = TRUE),
+                                     housing2_raw$MasVnrArea)
+}
+
+head(housing2_raw$GarageYrBlt,50)
+median(housing2_raw$GarageYrBlt, na.rm = TRUE)
+
+for (i in nrow(housing2_raw)) {
+  housing2_raw$GarageYrBlt <- ifelse(is.na(housing2_raw$GarageYrBlt), 
+                                     median(housing2_raw$GarageYrBlt, na.rm = TRUE),
+                                     housing2_raw$GarageYrBlt)
+}
+
+housing2_raw$MoSold <- as.factor(housing2_raw$MoSold)
+
+```
+
+###### Plot Numeric data
+Let us plot the numeric data now.
+```{r}
+numeric_housing2_raw <- Filter(is.numeric, housing2_raw)
+
+hist_plots_list <- list()
+for (i in 1:length(colnames(numeric_housing2_raw))){
+  print(i)
+  p1 <- eval(substitute(
+    ggplot(numeric_housing2_raw, aes(numeric_housing2_raw[, i])) + geom_histogram() +
+      xlab(colnames(numeric_housing2_raw)[i])
+  ,list(i = i)))
+  
+  hist_plots_list[[i]] <- p1
+}
+
+```
+
+```{r}
+hist_plots_list[[1]]
+hist_plots_list[[2]]
+hist_plots_list[[3]]
+hist_plots_list[[4]]
+hist_plots_list[[5]]
+hist_plots_list[[6]]
+hist_plots_list[[7]]
+hist_plots_list[[8]]
+hist_plots_list[[9]]
+hist_plots_list[[10]]
+hist_plots_list[[11]]
+hist_plots_list[[12]]
+hist_plots_list[[13]]
+hist_plots_list[[14]]
+hist_plots_list[[15]]
+hist_plots_list[[16]]
+hist_plots_list[[17]]
+hist_plots_list[[18]]
+hist_plots_list[[19]]
+hist_plots_list[[20]]
+hist_plots_list[[21]]
+hist_plots_list[[22]]
+hist_plots_list[[23]]
+hist_plots_list[[24]]
+hist_plots_list[[25]]
+hist_plots_list[[26]]
+hist_plots_list[[27]]
+hist_plots_list[[28]]
+hist_plots_list[[29]]
+hist_plots_list[[30]]
+hist_plots_list[[31]]
+hist_plots_list[[32]]
+hist_plots_list[[33]]
+hist_plots_list[[34]]
+hist_plots_list[[35]]
+hist_plots_list[[36]]
+
+
+```
+
+###### Factor data plots
+Plotting the plots for the factors now - to see how levels for each categorical feature impact the SalePrice
+```{r}
+factor_housing2_raw <- Filter(is.factor, housing2_raw)
+factor_housing2_raw <- cbind(factor_housing2_raw, housing2_raw$SalePrice)
+
+dim(factor_housing2_raw)
+
+colnames(factor_housing2_raw)[colnames(factor_housing2_raw) == 'housing2_raw$SalePrice'] <-
+  "SalePrice"
+
+box_plots_list <- list()
+for (i in 1:(length(colnames(factor_housing2_raw)) - 1)){
+  print(i)
+  p1 <- eval(substitute(
+    ggplot(factor_housing2_raw, aes(x = factor_housing2_raw[, i], y = SalePrice)) + 
+      geom_boxplot() +
+      xlab(colnames(factor_housing2_raw)[i])
+    ,list(i = i)))
+  
+  box_plots_list[[i]] <- p1
+}
+
+```
+
+```{r}
+box_plots_list[[1]]
+box_plots_list[[2]]
+box_plots_list[[3]]
+box_plots_list[[4]]
+box_plots_list[[5]]
+box_plots_list[[6]]
+box_plots_list[[7]]
+box_plots_list[[8]]
+box_plots_list[[9]]
+box_plots_list[[10]]
+box_plots_list[[11]]
+box_plots_list[[12]]
+box_plots_list[[13]]
+box_plots_list[[14]]
+box_plots_list[[15]]
+box_plots_list[[16]]
+box_plots_list[[17]]
+box_plots_list[[18]]
+box_plots_list[[19]]
+box_plots_list[[20]]
+box_plots_list[[21]]
+box_plots_list[[22]]
+box_plots_list[[23]]
+box_plots_list[[24]]
+box_plots_list[[25]]
+box_plots_list[[26]]
+box_plots_list[[27]]
+box_plots_list[[28]]
+box_plots_list[[29]]
+box_plots_list[[30]]
+box_plots_list[[31]]
+box_plots_list[[32]]
+box_plots_list[[33]]
+box_plots_list[[34]]
+box_plots_list[[35]]
+box_plots_list[[36]]
+box_plots_list[[37]]
+box_plots_list[[38]]
+box_plots_list[[39]]
+box_plots_list[[40]]
+box_plots_list[[41]]
+box_plots_list[[42]]
+box_plots_list[[43]]
+box_plots_list[[44]]
+
+```
+
+##### Correlation
+We will check now the correlation among the numerical variables
+```{r}
+#### Correlation
+
+corrMatrix <- round(cor(numeric_housing2_raw),4)
+
+corrMatrix %>% corrplot(., method = "color", outline = T, addgrid.col = "darkgray", 
+                        order="hclust", addrect = 4, rect.col = "black", 
+                        rect.lwd = 5,cl.pos = "b", tl.col = "indianred4", 
+                        tl.cex = 1.0, cl.cex = 1.0, addCoef.col = "white", 
+                        number.digits = 2, number.cex = 0.8, 
+                        col =
+                          colorRampPalette(c("darkred","white","dodgerblue4"))(100))
+
+cor_numVar <- cor(numeric_housing2_raw, use="pairwise.complete.obs") #correlations of all numeric variables
+
+#sort on decreasing correlations with SalePrice
+cor_sorted <- as.matrix(sort(cor_numVar[,'SalePrice'], decreasing = TRUE))
+#select only high corelations
+CorHigh <- names(which(apply(cor_sorted, 1, function(x) abs(x)>0.5)))
+cor_numVar <- cor_numVar[CorHigh, CorHigh]
+
+corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
+
+```
+
+Checking the relationship between OverallQual and SalePrice
+```{r}
+### SalePrice as compared with OverallQual
+
+ggplot(data = numeric_housing2_raw, aes(x = OverallQual, y = SalePrice)) +
+  geom_point()
+
+ggplot(data = numeric_housing2_raw, aes(x = as.factor(OverallQual), y = SalePrice)) +
+  geom_boxplot()
+
+### SalePrice as compared with GrLivArea
+
+ggplot(data = numeric_housing2_raw, aes(x = GrLivArea, y = SalePrice)) +
+  geom_point()
+
+### SalePrice as compared with GarageCars
+
+ggplot(data = numeric_housing2_raw, aes(x = as.factor(GarageCars), y = SalePrice)) +
+  geom_boxplot()
+
+```
+
+These plots show clear relationship of SalePrice with these 3 numeric features:
+Overall Quality - OverallQual
+GrLivArea - Above grade (ground) living area square feet
+GarageCars - Garage location
+
+
+#### Recoding the categorical features
+We will now work on recoding the categorical features so that they are ready to be fed into the regression models.
+
+```{r}
+##MSZoning
+summary(housing2_raw$MSZoning)
+housing2_raw$Zone[housing2_raw$MSZoning == "FV"] <- 4
+housing2_raw$Zone[housing2_raw$MSZoning == "RL"] <- 3
+housing2_raw$Zone[housing2_raw$MSZoning == "RH" | housing2_raw$MSZoning == "RM"] <- 2
+housing2_raw$Zone[housing2_raw$MSZoning == "C (all)"] <- 1
+
+table(housing2_raw$Zone)
+housing2_raw$MSZoning <- NULL
+
+##Street
+summary(housing2_raw$Street)
+
+housing2_raw$street_paved[housing2_raw$Street == "Pave"] <- 1
+housing2_raw$street_paved[housing2_raw$Street == "Grvl"] <- 0
+
+table(housing2_raw$street_paved)
+housing2_raw$Street <- NULL
+
+##3 Alley
+summary(housing2_raw$Alley)
+
+levels(housing2_raw$Alley) <- c(levels(housing2_raw$Alley), "None")
+
+housing2_raw$Alley[is.na(housing2_raw$Alley)] <- "None"
+
+housing2_raw$Paved_alley[housing2_raw$Alley == "Pave"] <- 1
+housing2_raw$Paved_alley[!housing2_raw$Alley == "Pave"] <- 0
+
+table(housing2_raw$Paved_alley)
+housing2_raw$Alley <- NULL
+
+##4 LotShape
+summary(housing2_raw$LotShape)
+
+housing2_raw$Lot_regular[housing2_raw$LotShape == "Reg"] <- 1
+housing2_raw$Lot_regular[!housing2_raw$LotShape == "Reg"] <- 0
+
+table(housing2_raw$Lot_regular)
+housing2_raw$LotShape <- NULL
+
+##5 LandContour
+summary(housing2_raw$LandContour)
+
+housing2_raw$LandContour_level[housing2_raw$LandContour == "Lvl"] <- 1
+housing2_raw$LandContour_level[!housing2_raw$LandContour == "Lvl"] <- 0
+
+table(housing2_raw$LandContour_level)
+housing2_raw$LandContour <- NULL
+
+##6 Utilities
+summary(housing2_raw$Utilities)
+
+### We can drop this column
+housing2_raw$Utilities <- NULL
+
+##7 LotConfig
+summary(housing2_raw$LotConfig)
+
+housing2_raw$LotConfig_culdsac_fr3[housing2_raw$LotConfig == "CulDSac" | housing2_raw$LotConfig == "FR3"] <- 1
+housing2_raw$LotConfig_culdsac_fr3[!(housing2_raw$LotConfig == "CulDSac" | housing2_raw$LotConfig == "FR3")] <- 0
+
+table(housing2_raw$LotConfig_culdsac_fr3)
+housing2_raw$LotConfig <- NULL
+
+##8 LandSlope
+summary(housing2_raw$LandSlope)
+
+### We don't see much difference with this. So we will drop this feature.
+housing2_raw$LandSlope <- NULL
+
+##9 Neighborhood
+summary(housing2_raw$Neighborhood)
+
+housing2_raw$Neighborhood_highprice <- ifelse(housing2_raw$Neighborhood %in% 
+                                                (which(with(housing2_raw, 
+                                                            tapply(SalePrice, Neighborhood, median)) > 200000) %>% names()), 
+                                              1, 0)
+
+table(housing2_raw$Neighborhood_highprice)
+
+housing2_raw$Neighborhood <- NULL
+
+##10 Condition1
+summary(housing2_raw$Condition1)
+
+housing2_raw$Condition1_good[housing2_raw$Condition1 == "PosN" | housing2_raw$Condition1 == "PosA"] <- 1
+housing2_raw$Condition1_good[!(housing2_raw$Condition1 == "PosN" | housing2_raw$Condition1 == "PosA")] <- 0
+
+table(housing2_raw$Condition1_good)
+housing2_raw$Condition1 <- NULL
+
+##11 Condition2
+summary(housing2_raw$Condition2)
+
+housing2_raw$Condition2_good[housing2_raw$Condition2 == "PosN" | housing2_raw$Condition2 == "PosA"] <- 1
+housing2_raw$Condition2_good[!(housing2_raw$Condition2 == "PosN" | housing2_raw$Condition2 == "PosA")] <- 0
+
+table(housing2_raw$Condition2_good)
+housing2_raw$Condition2 <- NULL
+
+##12 BldgType
+summary(housing2_raw$BldgType)
+
+housing2_raw$BldgType_singlefam_endtwnhse[housing2_raw$BldgType == "1Fam" | housing2_raw$BldgType == "TwnhsE"] <- 1
+housing2_raw$BldgType_singlefam_endtwnhse[!(housing2_raw$BldgType == "1Fam" | housing2_raw$BldgType == "TwnhsE")] <- 0
+
+table(housing2_raw$BldgType_singlefam_endtwnhse)
+housing2_raw$BldgType <- NULL
+
+##13 HouseStyle
+summary(housing2_raw$HouseStyle)
+
+housing2_raw$HouseStyle_level[housing2_raw$HouseStyle == "2Story" | housing2_raw$HouseStyle == "2.5Fin"] <- 1
+housing2_raw$HouseStyle_level[!(housing2_raw$HouseStyle == "2Story" | housing2_raw$HouseStyle == "2.5Fin")] <- 0
+
+table(housing2_raw$HouseStyle_level)
+housing2_raw$HouseStyle <- NULL
+
+##14 RoofStyle
+summary(housing2_raw$RoofStyle)
+
+housing2_raw$RoofStyle_level[housing2_raw$RoofStyle == "Hip" | housing2_raw$RoofStyle == "Flat" | housing2_raw$RoofStyle == "Shed"] <- 1
+housing2_raw$RoofStyle_level[!(housing2_raw$RoofStyle == "Hip" | housing2_raw$RoofStyle == "Flat" | housing2_raw$RoofStyle == "Shed")] <- 0
+
+table(housing2_raw$RoofStyle_level)
+housing2_raw$RoofStyle <- NULL
+
+##15 RoofMatl
+summary(housing2_raw$RoofMatl)
+
+housing2_raw$RoofMatl_level[housing2_raw$RoofMatl == "WdShake" | housing2_raw$RoofMatl == "WdShngl" | housing2_raw$RoofMatl == "Membran"] <- 1
+housing2_raw$RoofMatl_level[!(housing2_raw$RoofMatl == "WdShake" | housing2_raw$RoofMatl == "WdShngl" | housing2_raw$RoofMatl == "Membran")] <- 0
+
+table(housing2_raw$RoofMatl_level)
+housing2_raw$RoofMatl <- NULL
+
+##16 and 17Exterior1st and Exterior2nd
+
+summary(housing2_raw$Exterior1st)
+summary(housing2_raw$Exterior2nd)
+
+## Not using these as there is not much difference in the SalePrice
+housing2_raw$Exterior1st <- NULL
+housing2_raw$Exterior2nd <- NULL
+
+#18 MasVnrType
+summary(housing2_raw$MasVnrType)
+
+housing2_raw$MasVnrType_Stone[housing2_raw$MasVnrType == "Stone" & !is.na(housing2_raw$MasVnrType)] <- 1
+housing2_raw$MasVnrType_Stone[!(housing2_raw$MasVnrType == "Stone" & !is.na(housing2_raw$MasVnrType))] <- 0
+
+table(housing2_raw$MasVnrType_Stone)
+housing2_raw$MasVnrType <- NULL
+
+#19 ExterQual
+summary(housing2_raw$ExterQual)
+
+housing2_raw$ExterQual_level[housing2_raw$ExterQual == "Fa"] <- 1
+housing2_raw$ExterQual_level[housing2_raw$ExterQual == "TA"] <- 2
+housing2_raw$ExterQual_level[housing2_raw$ExterQual == "Gd"] <- 3
+housing2_raw$ExterQual_level[housing2_raw$ExterQual == "Ex"] <- 4
+
+table(housing2_raw$ExterQual_level)
+housing2_raw$ExterQual <- NULL
+
+#20 ExterCond
+summary(housing2_raw$ExterCond)
+
+housing2_raw$ExterCond_level[housing2_raw$ExterCond == "Po"] <- 1
+housing2_raw$ExterCond_level[housing2_raw$ExterCond == "Fa"] <- 2
+housing2_raw$ExterCond_level[housing2_raw$ExterCond == "TA"] <- 3
+housing2_raw$ExterCond_level[housing2_raw$ExterCond == "Gd"] <- 4
+housing2_raw$ExterCond_level[housing2_raw$ExterCond == "Ex"] <- 5
+
+table(housing2_raw$ExterCond_level)
+housing2_raw$ExterCond <- NULL
+
+#21 Foundation
+summary(housing2_raw$Foundation)
+
+housing2_raw$Foundation_concrete[housing2_raw$Foundation == "PConc"] <- 1
+housing2_raw$Foundation_concrete[!(housing2_raw$Foundation == "PConc")] <- 0
+
+table(housing2_raw$Foundation_concrete)
+housing2_raw$Foundation <- NULL
+
+#22 BsmtQual
+summary(housing2_raw$BsmtQual)
+
+
+housing2_raw$BsmtQual_level[housing2_raw$BsmtQual == "Fa" & !is.na(housing2_raw$BsmtQual)] <- 2
+housing2_raw$BsmtQual_level[housing2_raw$BsmtQual == "TA" & !is.na(housing2_raw$BsmtQual)] <- 3
+housing2_raw$BsmtQual_level[housing2_raw$BsmtQual == "Gd" & !is.na(housing2_raw$BsmtQual)] <- 4
+housing2_raw$BsmtQual_level[housing2_raw$BsmtQual == "Ex" & !is.na(housing2_raw$BsmtQual)] <- 5
+housing2_raw$BsmtQual_level[is.na(housing2_raw$BsmtQual)] <- 1
+housing2_raw$BsmtQual <- NULL
+
+#23 BsmtCond
+summary(housing2_raw$BsmtCond)
+
+housing2_raw$BsmtCond_level[housing2_raw$BsmtCond == "Po" | is.na(housing2_raw$BsmtCond)] <- 1
+housing2_raw$BsmtCond_level[housing2_raw$BsmtCond == "Fa" & !is.na(housing2_raw$BsmtCond)] <- 2
+housing2_raw$BsmtCond_level[housing2_raw$BsmtCond == "TA" & !is.na(housing2_raw$BsmtCond)] <- 3
+housing2_raw$BsmtCond_level[housing2_raw$BsmtCond == "Gd" & !is.na(housing2_raw$BsmtCond)] <- 4
+housing2_raw$BsmtCond_level[housing2_raw$BsmtCond == "Ex" & !is.na(housing2_raw$BsmtCond)] <- 5
+
+housing2_raw$BsmtCond <- NULL
+
+#24 BsmtExposure
+summary(housing2_raw$BsmtExposure)
+
+housing2_raw$BsmtExposure_level[housing2_raw$BsmtExposure == "No" | is.na(housing2_raw$BsmtExposure)] <- 1
+housing2_raw$BsmtExposure_level[housing2_raw$BsmtExposure == "Mn" & !is.na(housing2_raw$BsmtExposure)] <- 2
+housing2_raw$BsmtExposure_level[housing2_raw$BsmtExposure == "Av" & !is.na(housing2_raw$BsmtExposure)] <- 3
+housing2_raw$BsmtExposure_level[housing2_raw$BsmtExposure == "Gd" & !is.na(housing2_raw$BsmtExposure)] <- 4
+
+table(housing2_raw$BsmtExposure_level)
+housing2_raw$BsmtExposure <- NULL
+
+## 25 and 26 - BsmtFinType1 and BsmtFinType2
+### Not using these features as we have already considered the most important Basement
+### features
+housing2_raw$BsmtFinType1 <- NULL
+housing2_raw$BsmtFinType2 <- NULL
+
+## 27 - Heating
+summary(housing2_raw$Heating)
+
+housing2_raw$Heating_type[housing2_raw$Heating == "GasW" | housing2_raw$Heating == "GasA"] <- 1
+housing2_raw$Heating_type[!(housing2_raw$Heating == "GasW" | housing2_raw$Heating == "GasA")] <- 0
+
+table(housing2_raw$Heating_type)
+housing2_raw$Heating <- NULL
+
+## 28 - hEATINGqc
+summary(housing2_raw$HeatingQC)
+
+housing2_raw$HeatingQC_level[housing2_raw$HeatingQC == "Po"] <- 1
+housing2_raw$HeatingQC_level[housing2_raw$HeatingQC == "Fa"] <- 2
+housing2_raw$HeatingQC_level[housing2_raw$HeatingQC == "TA"] <- 3
+housing2_raw$HeatingQC_level[housing2_raw$HeatingQC == "Gd"] <- 4
+housing2_raw$HeatingQC_level[housing2_raw$HeatingQC == "Ex"] <- 5
+
+table(housing2_raw$HeatingQC_level)
+housing2_raw$HeatingQC <- NULL
+
+##29 - CentralAir
+summary(housing2_raw$CentralAir)
+
+housing2_raw$CentralAir_flag[housing2_raw$CentralAir == "Y"] <- 1
+housing2_raw$CentralAir_flag[housing2_raw$CentralAir == "N"] <- 0
+
+table(housing2_raw$CentralAir_flag)
+housing2_raw$CentralAir <- NULL
+
+##30 - Electrical
+summary(housing2_raw$Electrical)
+
+housing2_raw$Electrical_SBrkr[housing2_raw$Electrical == "SBrkr" & !is.na(housing2_raw$Electrical)] <- 1
+housing2_raw$Electrical_SBrkr[!(housing2_raw$Electrical == "SBrkr" & !is.na(housing2_raw$Electrical))] <- 0
+
+table(housing2_raw$Electrical_SBrkr)
+housing2_raw$Electrical <- NULL
+
+##31 - KitchenQual
+summary(housing2_raw$KitchenQual)
+
+housing2_raw$KitchenQual_level[housing2_raw$KitchenQual == "Fa"] <- 1
+housing2_raw$KitchenQual_level[housing2_raw$KitchenQual == "TA"] <- 2
+housing2_raw$KitchenQual_level[housing2_raw$KitchenQual == "Gd"] <- 3
+housing2_raw$KitchenQual_level[housing2_raw$KitchenQual == "Ex"] <- 4
+
+table(housing2_raw$KitchenQual_level)
+housing2_raw$KitchenQual <- NULL
+
+##32 - fUNCTIONAL
+## As seen in the box plots, we don't see much differences in the various category levels
+## So we won't be using this feature
+
+housing2_raw$Functional <- NULL
+
+##33 - FireplaceQu
+summary(housing2_raw$FireplaceQu)
+
+housing2_raw$FireplaceQu_level[housing2_raw$FireplaceQu == "Po" | is.na(housing2_raw$FireplaceQu)] <- 1
+housing2_raw$FireplaceQu_level[housing2_raw$FireplaceQu == "Fa" & !is.na(housing2_raw$FireplaceQu)] <- 2
+housing2_raw$FireplaceQu_level[housing2_raw$FireplaceQu == "TA" & !is.na(housing2_raw$FireplaceQu)] <- 3
+housing2_raw$FireplaceQu_level[housing2_raw$FireplaceQu == "Gd" & !is.na(housing2_raw$FireplaceQu)] <- 4
+housing2_raw$FireplaceQu_level[housing2_raw$FireplaceQu == "Ex" & !is.na(housing2_raw$FireplaceQu)] <- 5
+
+table(housing2_raw$FireplaceQu_level)
+housing2_raw$FireplaceQu <- NULL
+
+##34 - GarageType
+summary(housing2_raw$GarageType)
+
+housing2_raw$GarageType_within[(housing2_raw$GarageType == "Attchd" | housing2_raw$GarageType == "BuiltIn") & !is.na(housing2_raw$GarageType)] <- 1
+housing2_raw$GarageType_within[!((housing2_raw$GarageType == "Attchd" | housing2_raw$GarageType == "BuiltIn") & !is.na(housing2_raw$GarageType))] <- 0
+
+table(housing2_raw$GarageType_within)
+housing2_raw$GarageType <- NULL
+
+##35 - gARAGEfINISH
+summary(housing2_raw$GarageFinish)
+
+housing2_raw$GarageFinish_status[(housing2_raw$GarageFinish == "Fin" | housing2_raw$GarageFinish == "RFn") & !is.na(housing2_raw$GarageFinish)] <- 1
+housing2_raw$GarageFinish_status[!((housing2_raw$GarageFinish == "Fin" | housing2_raw$GarageFinish == "RFn") & !is.na(housing2_raw$GarageFinish))] <- 0
+
+table(housing2_raw$GarageFinish_status)
+housing2_raw$GarageFinish <- NULL
+
+##36 - GarageQual
+summary(housing2_raw$GarageQual)
+
+housing2_raw$GarageQual_level[housing2_raw$GarageQual == "Po" | is.na(housing2_raw$GarageQual)] <- 1
+housing2_raw$GarageQual_level[housing2_raw$GarageQual == "Fa" & !is.na(housing2_raw$GarageQual)] <- 2
+housing2_raw$GarageQual_level[housing2_raw$GarageQual == "TA" & !is.na(housing2_raw$GarageQual)] <- 3
+housing2_raw$GarageQual_level[housing2_raw$GarageQual == "Gd" & !is.na(housing2_raw$GarageQual)] <- 4
+housing2_raw$GarageQual_level[housing2_raw$GarageQual == "Ex" & !is.na(housing2_raw$GarageQual)] <- 5
+
+table(housing2_raw$GarageQual_level)
+housing2_raw$GarageQual <- NULL
+
+##37 - GarageCond
+summary(housing2_raw$GarageCond)
+
+housing2_raw$GarageCond_status[housing2_raw$GarageCond == "Po" | is.na(housing2_raw$GarageCond)] <- 1
+housing2_raw$GarageCond_status[housing2_raw$GarageCond == "Fa" & !is.na(housing2_raw$GarageCond)] <- 2
+housing2_raw$GarageCond_status[housing2_raw$GarageCond == "TA" & !is.na(housing2_raw$GarageCond)] <- 3
+housing2_raw$GarageCond_status[housing2_raw$GarageCond == "Gd" & !is.na(housing2_raw$GarageCond)] <- 4
+housing2_raw$GarageCond_status[housing2_raw$GarageCond == "Ex" & !is.na(housing2_raw$GarageCond)] <- 5
+
+table(housing2_raw$GarageCond_status)
+housing2_raw$GarageCond <- NULL
+
+##38 - PavedDrive
+summary(housing2_raw$PavedDrive)
+
+housing2_raw$PavedDrive_flag[housing2_raw$PavedDrive == "Y" | housing2_raw$PavedDrive == "P"] <- 1
+housing2_raw$PavedDrive_flag[housing2_raw$PavedDrive == "N"] <- 0
+
+table(housing2_raw$PavedDrive_flag)
+housing2_raw$PavedDrive <- NULL
+
+##39 - PoolQC
+summary(housing2_raw$PoolQC)
+
+housing2_raw$PoolQC_level[housing2_raw$PoolQC == "Fa" | is.na(housing2_raw$PoolQC)] <- 1
+housing2_raw$PoolQC_level[housing2_raw$PoolQC == "Gd" & !is.na(housing2_raw$PoolQC)] <- 2
+housing2_raw$PoolQC_level[housing2_raw$PoolQC == "Ex" & !is.na(housing2_raw$PoolQC)] <- 3
+
+table(housing2_raw$PoolQC_level)
+housing2_raw$PoolQC <- NULL
+
+##40 - Fence
+summary(housing2_raw$Fence)
+
+housing2_raw$Fence_good[housing2_raw$Fence == "GdPrv" & !is.na(housing2_raw$Fence)] <- 1
+housing2_raw$Fence_good[!(housing2_raw$Fence == "GdPrv" & !is.na(housing2_raw$Fence))] <- 0
+
+table(housing2_raw$Fence_good)
+housing2_raw$Fence <- NULL
+
+##41 - MiscFeature
+### nOT MUCH difference in the saleprice in the levels, hence we won't use it
+housing2_raw$MiscFeature <- NULL
+
+##42 - MoSold
+### nOT MUCH difference in the saleprice in the levels, hence we won't use it
+housing2_raw$MoSold <- NULL
+
+##43 - sALEtYPE
+summary(housing2_raw$SaleType)
+
+housing2_raw$SaleType_value[housing2_raw$SaleType == "New" | housing2_raw$SaleType == "Con"] <- 3
+housing2_raw$SaleType_value[housing2_raw$SaleType == "ConLw" | housing2_raw$SaleType == "CWD" | housing2_raw$SaleType == "WD"] <- 2
+housing2_raw$SaleType_value[housing2_raw$SaleType == "COD" | housing2_raw$SaleType == "ConLD" | 
+                        housing2_raw$SaleType == "ConLI"  | housing2_raw$SaleType == "Oth"] <- 1
+
+table(housing2_raw$SaleType_value)
+
+housing2_raw$SaleType <- NULL
+
+## 44 - SaleCondition
+### Dropping this feature and not using it
+housing2_raw$SaleCondition <- NULL
+
+########## All features are now ready
+dim(housing2_raw)
+summary(housing2_raw)
+
+
+```
+
+
+Checking Missing data again - to ensure all good, and there is no missing data 
+```{r}
+### Blank data
+train_missing_df2 <- data.frame(apply(housing2_raw, 2, function(x) length(which(x == ''))))
+colnames(train_missing_df2) <- "counts"
+train_missing_df2$column_name <- rownames(train_missing_df2)
+train_missing_df2 <- data.frame(train_missing_df2[train_missing_df2$counts > 0,])
+print(train_missing_df2)
+
+### NA data
+train_na_df2 <- data.frame(apply(housing2_raw, 2, function(x) length(which(is.na(x)))))
+
+colnames(train_na_df2) <- "counts"
+train_na_df2$column_name <- rownames(train_na_df2)
+train_na_df2 <- data.frame(train_na_df2[train_na_df2$counts > 0,])
+print(train_na_df2)
+
+```
+
+Now there is no missing data or NA's.
+
+#### Preparing for the model now.
+Taking the SalePrice - the target variable to the front of the dataframe by reordering the features in the dataframe.
+```{r}
+housing2_raw <- housing2_raw[,c(36,1:35,37:70)]
+
+colnames(housing2_raw)
+```
+
+##### Test-Train split
+Splitting the data into test and train datasets
+```{r}
+n <- nrow(housing2_raw)
+set.seed(123)
+housing2_random_index <- housing2_raw[sample(n), ]
+
+housing2.train.df <- housing2_raw[1:as.integer(0.8*n),]
+
+housing2.test.df <- housing2_raw[as.integer(0.8*n +1):n, ]
+
+nrow(housing2.train.df)
+nrow(housing2.test.df)
+
+
+```
+
+#### Models
+Building first model - taking all the features.
+```{r}
+#### Linear Model 1
+g1 <- lm(SalePrice ~ ., 
+         data = housing2.train.df)
+
+summary(g1) 
+```
+
+As we see above, many of the variables are not statistically significant. So we are only taking the significant features.
+```{r}
+g2 <- lm(SalePrice ~ MSSubClass + LotFrontage + LotArea + OverallQual + OverallCond +
+           YearBuilt + MasVnrArea + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF +
+           X2ndFlrSF + LowQualFinSF + BedroomAbvGr + KitchenAbvGr + TotRmsAbvGrd +
+           GarageArea + WoodDeckSF + ScreenPorch + Paved_alley + LotConfig_culdsac_fr3 +
+           Neighborhood_highprice + Condition1_good + Condition2_good + RoofMatl_level +
+           ExterQual_level + BsmtQual_level + BsmtCond_level + BsmtExposure_level +
+           KitchenQual_level + PoolQC_level + SaleType_value + GarageCond_status, 
+         data = housing2.train.df)
+
+summary(g2) 
+
+```
+Model diagnostic plots
+```{r}
+#resid_panel(g2, plots='default', smoother = TRUE)
+plot(g2)
+```
+
+
+Removing statistically insignificant features further.
+```{r}
+g3 <- lm(SalePrice ~ MSSubClass + LotFrontage + LotArea + OverallQual + OverallCond +
+           YearBuilt + MasVnrArea + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF +
+           X2ndFlrSF + LowQualFinSF + BedroomAbvGr + KitchenAbvGr + TotRmsAbvGrd +
+           GarageArea + WoodDeckSF + ScreenPorch +
+           Neighborhood_highprice + Condition1_good + Condition2_good + RoofMatl_level +
+           ExterQual_level + BsmtQual_level + BsmtCond_level + BsmtExposure_level +
+           KitchenQual_level + PoolQC_level + SaleType_value + GarageCond_status, 
+         data = housing2.train.df)
+
+summary(g3) 
+
+```
+
+Model diagnostic plots
+```{r}
+#resid_panel(g3, plots='default', smoother = TRUE)
+plot(g3)
+```
+
+As residuals are a curve shape, we will try taking the log of the SalePrice, which is the target variable.
+```{r}
+### Taking log
+g4 <- lm(log(SalePrice) ~ MSSubClass + LotFrontage + LotArea + OverallQual +
+           OverallCond +
+           YearBuilt + MasVnrArea + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF +
+           X2ndFlrSF + LowQualFinSF + BedroomAbvGr + KitchenAbvGr + TotRmsAbvGrd +
+           GarageArea + WoodDeckSF + ScreenPorch +
+           Neighborhood_highprice + Condition1_good + Condition2_good + RoofMatl_level
+         + ExterQual_level + BsmtQual_level + BsmtCond_level + BsmtExposure_level +
+           KitchenQual_level + PoolQC_level + SaleType_value + GarageCond_status, 
+         data = housing2.train.df)
+
+summary(g4) 
+
+```
+
+Model diagnostic plots
+```{r}
+plot(g4)
+```
+
+Removing further the features which are statistically insignificant
+```{r}
+## Removing further 
+g6 <- lm(log(SalePrice) ~ MSSubClass + LotFrontage + LotArea + OverallQual + OverallCond +
+           YearBuilt + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF +
+           X2ndFlrSF + LowQualFinSF + KitchenAbvGr + TotRmsAbvGrd +
+           GarageArea + WoodDeckSF + ScreenPorch +
+           Neighborhood_highprice + Condition2_good +
+           BsmtQual_level + BsmtExposure_level +
+           KitchenQual_level + SaleType_value + GarageCond_status, 
+         data = housing2.train.df)
+
+summary(g6) 
+
+```
+
+Model diagnostic plots
+```{r}
+plot(g6)
+```
+
+
+This is the best one as it has the biggest R-squared, and the plots also suggest that the assumptions of the linear model are all true.
+###### Prediction of test dataset
+```{r}
+Predicted_test_raw2 <- predict(g6, newdata = housing2.test.df)
+
+Predicted_test_final2 <- exp(Predicted_test_raw2)
+
+Test_predicted_values2 <- cbind(data.frame(housing2.test.df$SalePrice), 
+                               data.frame(Predicted_test_final2))
+
+class(Test_predicted_values2)
+names(Test_predicted_values2) <- c("Actual", "Predicted")
+
+head(Test_predicted_values2, 20)
+
+```
+
+Plots for the most relevant features - one by one:
+
+```{r}
+summary(housing2_raw$OverallQual)
+ggplot(data = housing2_raw, aes(x = as.factor(OverallQual), y = SalePrice)) +
+  geom_boxplot()
+
+summary(housing2_raw$OverallCond)
+ggplot(data = housing2_raw, aes(x = as.factor(OverallCond), y = SalePrice)) +
+  geom_boxplot()
+
+summary(housing2_raw$YearBuilt)
+ggplot(data = housing2_raw, aes(x = YearBuilt, y = SalePrice)) +
+  geom_point() + geom_smooth(method=lm , color="blue", se=FALSE)
+
+summary(housing2_raw$BsmtFinSF1)
+ggplot(data = housing2_raw, aes(x = BsmtFinSF1, y = SalePrice)) +
+  geom_point() + geom_smooth(method=lm , color="blue", se=FALSE)
+
+summary(housing2_raw$X1stFlrSF)
+ggplot(data = housing2_raw, aes(x = X1stFlrSF, y = SalePrice)) +
+  geom_point() + geom_smooth(method=lm , color="blue", se=FALSE)
+
+summary(housing2_raw$X2ndFlrSF)
+ggplot(data = housing2_raw, aes(x = X2ndFlrSF, y = SalePrice)) +
+  geom_point() + geom_smooth(method=lm , color="blue", se=FALSE)
+
+
+summary(housing2_raw$Neighborhood_highprice)
+ggplot(data = housing2_raw, aes(x = as.factor(Neighborhood_highprice), 
+                                y = SalePrice)) +
+  geom_boxplot()
+
+summary(housing2_raw$Condition2_good)
+ggplot(data = housing2_raw, aes(x = as.factor(Condition2_good), 
+                                y = SalePrice)) +
+  geom_boxplot()
+
+```
+
+
+#### Conclusion
+1. There is a very clear Log linear relationship between the target feature - Sale Price and the following independent features. 
+
+MSSubClass
+
+LotFrontage
+
+LotArea
+
+OverallQual
+
+OverallCond
+
+YearBuilt
+
+BsmtFinSF1
+
+BsmtFinSF2
+
+BsmtUnfSF
+
+X1stFlrSF
+
+X2ndFlrSF
+
+LowQualFinSF
+
+KitchenAbvGr
+
+TotRmsAbvGrd
+
+GarageArea
+
+WoodDeckSF
+
+ScreenPorch
+
+Neighborhood_highprice
+
+Condition2_good
+
+BsmtQual_level
+
+BsmtExposure_level
+
+KitchenQual_level
+
+SaleType_value
+
+GarageCond_status
+
+
+2. The most relevant features are:
+
+OverallQual
+
+OverallCond
+
+YearBuilt
+
+BsmtFinSF1
+
+X1stFlrSF
+
+X2ndFlrSF
+
+Condition2_good
